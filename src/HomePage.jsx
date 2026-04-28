@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -28,47 +29,32 @@ const globalStyles = `
   .nav-link.active { background: rgba(255,255,255,0.18); color: #fff; }
 
   .btn-connect {
-    background: #fff;
-    color: #0a5c8a;
-    border: none;
+    background: transparent;
+    color: #fff;
+    border: 1.5px solid rgba(255,255,255,0.6);
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 14px;
     font-weight: 600;
     padding: 8px 20px;
     border-radius: 6px;
     cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .btn-connect:hover { opacity: 0.9; }
-
-  .cta-btn {
-    background: #0a5c8a;
-    color: #fff;
-    border: none;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 600;
-    padding: 14px 32px;
-    border-radius: 8px;
-    cursor: pointer;
-    letter-spacing: 0.02em;
-    transition: background 0.2s, transform 0.15s;
-  }
-  .cta-btn:hover { background: #084f79; transform: translateY(-1px); }
-
-  .cta-outline {
-    background: transparent;
-    color: #0a5c8a;
-    border: 1.5px solid #0a5c8a;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    padding: 13px 28px;
-    border-radius: 8px;
-    cursor: pointer;
     transition: background 0.2s;
   }
-  .cta-outline:hover { background: #eef6fb; }
+  .btn-connect:hover { background: rgba(255,255,255,0.12); }
+
+  .btn-register {
+    background: #fff;
+    color: #0a5c8a;
+    border: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .btn-register:hover { opacity: 0.9; transform: translateY(-1px); }
 
   .feature-card {
     background: #fff;
@@ -159,12 +145,12 @@ const features = [
 const stats = [
   { value: "Ready", label: "Système prêt à l'utilisation" },
   { value: "98 %", label: "Satisfaction" },
-  { value: "100% ", label: "Données protégées en continu" },
+  { value: "100%", label: "Données protégées en continu" },
   { value: "24/7", label: "Disponibilité" },
 ];
 
 export default function HomePage() {
-
+  const navigate = useNavigate();
 
   return (
     <>
@@ -198,9 +184,15 @@ export default function HomePage() {
             </span>
           </div>
 
-        
-
-          <button className="btn-connect">Connexion</button>
+          {/* Boutons Connexion + Inscription */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn-connect" onClick={() => navigate("/connexion")}>
+              Connexion
+            </button>
+            <button className="btn-register" onClick={() => navigate("/inscription")}>
+              Inscription
+            </button>
+          </div>
         </nav>
 
         {/* Hero */}
@@ -214,8 +206,6 @@ export default function HomePage() {
         }}>
           <div style={{ position:"absolute", top:-60, right:-60, width:280, height:280, borderRadius:"50%", background:"rgba(10,92,138,0.05)", pointerEvents:"none" }}/>
           <div style={{ position:"absolute", bottom:-80, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(15,110,86,0.05)", pointerEvents:"none" }}/>
-
-          
 
           <h1 className="anim anim-2" style={{
             fontFamily: "'Playfair Display', serif",
@@ -293,9 +283,6 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-
-        {/* CTA Banner */}
-        
 
         {/* Footer */}
         <footer style={{
