@@ -54,19 +54,6 @@ const globalStyles = `
     box-shadow: 0 0 0 3px rgba(10,92,138,0.08);
   }
 
-  .role-card {
-    flex: 1;
-    border: 2px solid #dde3ea;
-    border-radius: 12px;
-    padding: 20px 16px;
-    cursor: pointer;
-    text-align: center;
-    transition: border 0.2s, background 0.2s;
-    background: #fff;
-  }
-  .role-card:hover { border-color: #0a5c8a; background: #eef6fb; }
-  .role-card.selected { border-color: #0a5c8a; background: #eef6fb; }
-
   .btn-submit {
     width: 100%;
     padding: 13px;
@@ -145,7 +132,6 @@ const EyeIcon = ({ open }) => open ? (
 
 export default function InscriptionPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [erreurConfirm, setErreurConfirm] = useState("");
@@ -172,11 +158,7 @@ export default function InscriptionPage() {
       setErreurConfirm("Les mots de passe ne correspondent pas.");
       return;
     }
-    if (!role) {
-      alert("Veuillez sélectionner un rôle : Patient ou Médecin.");
-      return;
-    }
-    alert(`Inscription réussie !\nRôle : ${role}\nNom : ${form.prenom} ${form.nom}\nTél : ${form.prefix} ${form.telephone}`);
+    alert(`Inscription réussie !\nNom : ${form.prenom} ${form.nom}\nTél : ${form.prefix} ${form.telephone}`);
   };
 
   const passwordMatch = form.confirm && form.password === form.confirm;
@@ -229,7 +211,7 @@ export default function InscriptionPage() {
             </div>
 
             <form onSubmit={handleSubmit}>
-                
+
               {/* Prénom + Nom */}
               <div style={{ display: "flex", gap: 14, marginBottom: 18 }}>
                 <div style={{ flex: 1 }}>
