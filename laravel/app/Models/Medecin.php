@@ -4,30 +4,24 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Patient extends Model
+class Medecin extends Model
 {
     protected $fillable = [
         'nom',
         'prenom',
-        'date_naissance',
-        'sexe',
-        'adresse',
+        'specialite',
         'telephone',
         'email',
+        'numero_ordre',
     ];
-
-    public function consultations()
-    {
-        return $this->hasMany(Consultation::class);
-    }
 
     public function prescriptions()
     {
         return $this->hasMany(Prescription::class);
     }
 
-    public function hospitalisations()
+    public function rendezVous()
     {
-        return $this->hasMany(Hospitalisation::class);
+        return $this->hasMany(RendezVous::class);
     }
 }
