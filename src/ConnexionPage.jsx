@@ -100,6 +100,13 @@ export default function ConnexionPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     alert(`Connexion réussie !\nEmail : ${form.email}`);
+    if (form.email.includes("admin")) {
+	  navigate("/dashboard/admin");
+    } else if (form.email.includes("medecin")) {
+	 navigate("/dashboard/medecin");
+    } else {
+	navigate("/dashboard/patient");
+}
   };
 
   return (
