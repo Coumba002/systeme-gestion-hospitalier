@@ -5,12 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use OpenApi\Attributes as OA;
 
 class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
+    #[OA\Get(
+        path: "/users",
+        operationId: "getUsersList",
+        tags: ["Users"],
+        summary: "Get list of users",
+        description: "Returns list of users"
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
         return \App\Http\Resources\UserResource::collection(User::all());
@@ -19,6 +29,26 @@ class UserController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+    #[OA\Post(
+        path: "/users",
+        operationId: "storeUser",
+        tags: ["Users"],
+        summary: "Create a new user",
+        description: "Creates a new user record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["name", "email", "password"],
+            properties: [
+                new OA\Property(property: "name", type: "string", example: "Admin User"),
+                new OA\Property(property: "email", type: "string", format: "email", example: "admin@hospital.com"),
+                new OA\Property(property: "password", type: "string", format: "password", example: "secret123"),
+                new OA\Property(property: "role", type: "string", example: "admin")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "User created")]
     public function store(Request $request)
     {
         $validated = $request->validate([

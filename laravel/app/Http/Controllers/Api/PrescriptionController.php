@@ -5,20 +5,48 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class PrescriptionController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    #[OA\Get(
+        path: "/prescriptions",
+        operationId: "getPrescriptionsList",
+        tags: ["Prescriptions"],
+        summary: "Get list of prescriptions",
+        description: "Returns list of prescriptions"
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
         return \App\Http\Resources\PrescriptionResource::collection(Prescription::all());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    #[OA\Post(
+        path: "/prescriptions",
+        operationId: "storePrescription",
+        tags: ["Prescriptions"],
+        summary: "Create a new prescription",
+        description: "Creates a new prescription record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["patient_id", "medecin_id", "date_prescription", "medications", "dosage", "frequency", "duration"],
+            properties: [
+                new OA\Property(property: "patient_id", type: "integer", example: 1),
+                new OA\Property(property: "medecin_id", type: "integer", example: 1),
+                new OA\Property(property: "date_prescription", type: "string", format: "date", example: "2026-05-01"),
+                new OA\Property(property: "medications", type: "string", example: "Paracetamol"),
+                new OA\Property(property: "dosage", type: "string", example: "1000mg"),
+                new OA\Property(property: "frequency", type: "string", example: "3 times a day"),
+                new OA\Property(property: "duration", type: "string", example: "5 days"),
+                new OA\Property(property: "notes", type: "string", example: "Take after meals"),
+                new OA\Property(property: "status", type: "string", example: "active")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "Prescription created")]
     public function store(Request $request)
     {
         $validated = $request->validate([

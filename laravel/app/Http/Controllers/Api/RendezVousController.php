@@ -5,20 +5,45 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RendezVous;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class RendezVousController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    #[OA\Get(
+        path: "/rendezvous",
+        operationId: "getRendezVousList",
+        tags: ["RendezVous"],
+        summary: "Get list of rendezvous",
+        description: "Returns list of rendezvous"
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
         return \App\Http\Resources\RendezVousResource::collection(RendezVous::all());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    #[OA\Post(
+        path: "/rendezvous",
+        operationId: "storeRendezVous",
+        tags: ["RendezVous"],
+        summary: "Create a new rendezvous",
+        description: "Creates a new rendezvous record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["patient_id", "medecin_id", "date_rendez_vous", "heure_rendez_vous"],
+            properties: [
+                new OA\Property(property: "patient_id", type: "integer", example: 1),
+                new OA\Property(property: "medecin_id", type: "integer", example: 1),
+                new OA\Property(property: "date_rendez_vous", type: "string", format: "date", example: "2026-05-10"),
+                new OA\Property(property: "heure_rendez_vous", type: "string", example: "14:30:00"),
+                new OA\Property(property: "motif", type: "string", example: "Consultation générale"),
+                new OA\Property(property: "status", type: "string", example: "planifié")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "RendezVous created")]
     public function store(Request $request)
     {
         $validated = $request->validate([

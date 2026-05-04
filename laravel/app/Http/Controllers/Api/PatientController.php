@@ -5,20 +5,48 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use Illuminate\Http\Request;
-
+use OpenApi\Attributes as OA;
 class PatientController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    #[OA\Get(
+        path: "/patients",
+        operationId: "getPatientsList",
+        tags: ["Patients"],
+        summary: "Get list of patients",
+        description: "Returns list of patients"
+    )]
+    #[OA\Response(
+        response: 200,
+        description: "Successful operation"
+    )]
     public function index()
     {
         return \App\Http\Resources\PatientResource::collection(Patient::all());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    #[OA\Post(
+        path: "/patients",
+        operationId: "storePatient",
+        tags: ["Patients"],
+        summary: "Create a new patient",
+        description: "Creates a new patient record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["nom", "prenom", "date_naissance", "sexe", "adresse", "telephone"],
+            properties: [
+                new OA\Property(property: "nom", type: "string", example: "Doe"),
+                new OA\Property(property: "prenom", type: "string", example: "John"),
+                new OA\Property(property: "date_naissance", type: "string", format: "date", example: "1990-01-01"),
+                new OA\Property(property: "sexe", type: "string", example: "M"),
+                new OA\Property(property: "adresse", type: "string", example: "123 Main St"),
+                new OA\Property(property: "telephone", type: "string", example: "0600000000"),
+                new OA\Property(property: "email", type: "string", format: "email", example: "john@example.com")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "Patient created")]
     public function store(Request $request)
     {
         $validated = $request->validate([

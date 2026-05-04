@@ -5,20 +5,43 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Infirmier;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class InfirmierController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    #[OA\Get(
+        path: "/infirmiers",
+        operationId: "getInfirmiersList",
+        tags: ["Infirmiers"],
+        summary: "Get list of infirmiers",
+        description: "Returns list of infirmiers"
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
         return \App\Http\Resources\InfirmierResource::collection(Infirmier::all());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    #[OA\Post(
+        path: "/infirmiers",
+        operationId: "storeInfirmier",
+        tags: ["Infirmiers"],
+        summary: "Create a new infirmier",
+        description: "Creates a new infirmier record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["nom", "prenom"],
+            properties: [
+                new OA\Property(property: "nom", type: "string", example: "Smith"),
+                new OA\Property(property: "prenom", type: "string", example: "Anna"),
+                new OA\Property(property: "telephone", type: "string", example: "0600000000"),
+                new OA\Property(property: "email", type: "string", format: "email", example: "anna@hospital.com")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "Infirmier created")]
     public function store(Request $request)
     {
         $validated = $request->validate([

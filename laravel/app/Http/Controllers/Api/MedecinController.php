@@ -5,20 +5,45 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Medecin;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class MedecinController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    #[OA\Get(
+        path: "/medecins",
+        operationId: "getMedecinsList",
+        tags: ["Medecins"],
+        summary: "Get list of medecins",
+        description: "Returns list of medecins"
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
         return \App\Http\Resources\MedecinResource::collection(Medecin::all());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    #[OA\Post(
+        path: "/medecins",
+        operationId: "storeMedecin",
+        tags: ["Medecins"],
+        summary: "Create a new medecin",
+        description: "Creates a new medecin record",
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ["nom", "prenom", "specialite"],
+            properties: [
+                new OA\Property(property: "nom", type: "string", example: "Doe"),
+                new OA\Property(property: "prenom", type: "string", example: "Jane"),
+                new OA\Property(property: "specialite", type: "string", example: "Cardiologie"),
+                new OA\Property(property: "telephone", type: "string", example: "0600000000"),
+                new OA\Property(property: "email", type: "string", format: "email", example: "jane@hospital.com"),
+                new OA\Property(property: "numero_ordre", type: "string", example: "123456")
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: "Medecin created")]
     public function store(Request $request)
     {
         $validated = $request->validate([
