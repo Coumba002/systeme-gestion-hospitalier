@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getUser, logout } from "./api";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -68,6 +69,28 @@ const menuItems = [
 export default function DashboardPatient() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const u = getUser();
+    if (!u) {
+      navigate("/connexion");
+      return;
+    }
+    setUser(u);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/connexion");
+  };
+
+  const prenom = user?.prenom || user?.name?.split(" ")[0] || "Patient";
+  const nom = user?.nom || user?.name?.split(" ")[1] || "";
+  const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase();
+  const dateAujourdhui = new Date().toLocaleDateString("fr-FR", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric"
+  });
 
   return (
     <>
@@ -93,13 +116,13 @@ export default function DashboardPatient() {
           </div>
           <div className="sidebar-footer">
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 4 }}>
-              <div className="user-avatar">FN</div>
+              <div className="user-avatar">{initiales}</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Fatou Ndiaye</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{prenom} {nom}</div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Patient</div>
               </div>
             </div>
-            <button className="logout-btn" onClick={() => navigate("/connexion")}>
+            <button className="logout-btn" onClick={handleLogout}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
               Déconnexion
             </button>
@@ -110,12 +133,12 @@ export default function DashboardPatient() {
         <main className="main-content">
           <div className="topbar">
             <div>
-              <div className="page-title">Bonjour, Fatou 👋</div>
-              <div className="page-sub">Dimanche 26 avril 2026 · Voici votre espace santé</div>
+              <div className="page-title">Bonjour, {prenom} 👋</div>
+              <div className="page-sub">{dateAujourdhui} · Voici votre espace santé</div>
             </div>
             <div className="user-pill">
-              <div className="user-avatar">FN</div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>Fatou Ndiaye</span>
+              <div className="user-avatar">{initiales}</div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
             </div>
           </div>
 
