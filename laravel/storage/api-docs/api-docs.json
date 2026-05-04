@@ -1,0 +1,471 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Hospital Management API",
+        "description": "API Documentation for the Hospital Management System",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000/api",
+            "description": "Local API Server"
+        }
+    ],
+    "paths": {
+        "/infirmiers": {
+            "get": {
+                "tags": [
+                    "Infirmiers"
+                ],
+                "summary": "Get list of infirmiers",
+                "description": "Returns list of infirmiers",
+                "operationId": "getInfirmiersList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Infirmiers"
+                ],
+                "summary": "Create a new infirmier",
+                "description": "Creates a new infirmier record",
+                "operationId": "storeInfirmier",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nom",
+                                    "prenom"
+                                ],
+                                "properties": {
+                                    "nom": {
+                                        "type": "string",
+                                        "example": "Smith"
+                                    },
+                                    "prenom": {
+                                        "type": "string",
+                                        "example": "Anna"
+                                    },
+                                    "telephone": {
+                                        "type": "string",
+                                        "example": "0600000000"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "anna@hospital.com"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Infirmier created"
+                    }
+                }
+            }
+        },
+        "/medecins": {
+            "get": {
+                "tags": [
+                    "Medecins"
+                ],
+                "summary": "Get list of medecins",
+                "description": "Returns list of medecins",
+                "operationId": "getMedecinsList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Medecins"
+                ],
+                "summary": "Create a new medecin",
+                "description": "Creates a new medecin record",
+                "operationId": "storeMedecin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nom",
+                                    "prenom",
+                                    "specialite"
+                                ],
+                                "properties": {
+                                    "nom": {
+                                        "type": "string",
+                                        "example": "Doe"
+                                    },
+                                    "prenom": {
+                                        "type": "string",
+                                        "example": "Jane"
+                                    },
+                                    "specialite": {
+                                        "type": "string",
+                                        "example": "Cardiologie"
+                                    },
+                                    "telephone": {
+                                        "type": "string",
+                                        "example": "0600000000"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "jane@hospital.com"
+                                    },
+                                    "numero_ordre": {
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Medecin created"
+                    }
+                }
+            }
+        },
+        "/patients": {
+            "get": {
+                "tags": [
+                    "Patients"
+                ],
+                "summary": "Get list of patients",
+                "description": "Returns list of patients",
+                "operationId": "getPatientsList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Patients"
+                ],
+                "summary": "Create a new patient",
+                "description": "Creates a new patient record",
+                "operationId": "storePatient",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nom",
+                                    "prenom",
+                                    "date_naissance",
+                                    "sexe",
+                                    "adresse",
+                                    "telephone"
+                                ],
+                                "properties": {
+                                    "nom": {
+                                        "type": "string",
+                                        "example": "Doe"
+                                    },
+                                    "prenom": {
+                                        "type": "string",
+                                        "example": "John"
+                                    },
+                                    "date_naissance": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "1990-01-01"
+                                    },
+                                    "sexe": {
+                                        "type": "string",
+                                        "example": "M"
+                                    },
+                                    "adresse": {
+                                        "type": "string",
+                                        "example": "123 Main St"
+                                    },
+                                    "telephone": {
+                                        "type": "string",
+                                        "example": "0600000000"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Patient created"
+                    }
+                }
+            }
+        },
+        "/prescriptions": {
+            "get": {
+                "tags": [
+                    "Prescriptions"
+                ],
+                "summary": "Get list of prescriptions",
+                "description": "Returns list of prescriptions",
+                "operationId": "getPrescriptionsList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Prescriptions"
+                ],
+                "summary": "Create a new prescription",
+                "description": "Creates a new prescription record",
+                "operationId": "storePrescription",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "patient_id",
+                                    "medecin_id",
+                                    "date_prescription",
+                                    "medications",
+                                    "dosage",
+                                    "frequency",
+                                    "duration"
+                                ],
+                                "properties": {
+                                    "patient_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "medecin_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "date_prescription": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-05-01"
+                                    },
+                                    "medications": {
+                                        "type": "string",
+                                        "example": "Paracetamol"
+                                    },
+                                    "dosage": {
+                                        "type": "string",
+                                        "example": "1000mg"
+                                    },
+                                    "frequency": {
+                                        "type": "string",
+                                        "example": "3 times a day"
+                                    },
+                                    "duration": {
+                                        "type": "string",
+                                        "example": "5 days"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Take after meals"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "example": "active"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Prescription created"
+                    }
+                }
+            }
+        },
+        "/rendezvous": {
+            "get": {
+                "tags": [
+                    "RendezVous"
+                ],
+                "summary": "Get list of rendezvous",
+                "description": "Returns list of rendezvous",
+                "operationId": "getRendezVousList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "RendezVous"
+                ],
+                "summary": "Create a new rendezvous",
+                "description": "Creates a new rendezvous record",
+                "operationId": "storeRendezVous",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "patient_id",
+                                    "medecin_id",
+                                    "date_rendez_vous",
+                                    "heure_rendez_vous"
+                                ],
+                                "properties": {
+                                    "patient_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "medecin_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "date_rendez_vous": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-05-10"
+                                    },
+                                    "heure_rendez_vous": {
+                                        "type": "string",
+                                        "example": "14:30:00"
+                                    },
+                                    "motif": {
+                                        "type": "string",
+                                        "example": "Consultation générale"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "example": "planifié"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "RendezVous created"
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get list of users",
+                "description": "Returns list of users",
+                "operationId": "getUsersList",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Create a new user",
+                "description": "Creates a new user record",
+                "operationId": "storeUser",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Admin User"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "admin@hospital.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "secret123"
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "example": "admin"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User created"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Infirmiers",
+            "description": "Infirmiers"
+        },
+        {
+            "name": "Medecins",
+            "description": "Medecins"
+        },
+        {
+            "name": "Patients",
+            "description": "Patients"
+        },
+        {
+            "name": "Prescriptions",
+            "description": "Prescriptions"
+        },
+        {
+            "name": "RendezVous",
+            "description": "RendezVous"
+        },
+        {
+            "name": "Users",
+            "description": "Users"
+        }
+    ]
+}
