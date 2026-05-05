@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { register } from "./api";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -135,6 +136,8 @@ export default function InscriptionPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [erreurConfirm, setErreurConfirm] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     prenom: "", nom: "", sexe: "", age: "",
     telephone: "", prefix: "+221",
@@ -152,13 +155,32 @@ export default function InscriptionPage() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.password !== form.confirm) {
       setErreurConfirm("Les mots de passe ne correspondent pas.");
       return;
     }
-    alert(`Inscription réussie !\nNom : ${form.prenom} ${form.nom}\nTél : ${form.prefix} ${form.telephone}`);
+    setLoading(true);
+    setErreur("");
+    try {
+      await register({
+        name: `${form.prenom} ${form.nom}`,
+        email: form.email,
+        password: form.password,
+        // Champs supplémentaires si votre API les accepte
+        prenom: form.prenom,
+        nom: form.nom,
+        sexe: form.sexe,
+        age: form.age,
+        telephone: `${form.prefix}${form.telephone}`,
+      });
+      navigate("/dashboard/patient"); // Nouvel utilisateur → dashboard patient
+    } catch (err) {
+      setErreur(err.message || "Erreur lors de l'inscription");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const passwordMatch = form.confirm && form.password === form.confirm;
@@ -329,9 +351,16 @@ export default function InscriptionPage() {
                 )}
               </div>
 
+              {/* Erreur globale */}
+              {erreur && (
+                <div style={{ background: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#c0392b" }}>
+                  {erreur}
+                </div>
+              )}
+
               {/* Bouton */}
-              <button type="submit" className="btn-submit">
-                Créer mon compte
+              <button type="submit" className="btn-submit" disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
+                {loading ? "Création en cours..." : "Créer mon compte"}
               </button>
 
               {/* Lien connexion */}
