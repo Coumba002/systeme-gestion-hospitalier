@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "./api";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -93,30 +92,21 @@ export default function ConnexionPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [erreur, setErreur] = useState("");
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setErreur("");
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setErreur("");
-    try {
-      const { user } = await login(form.email, form.password);
-      // Redirection selon le rôle
-      const role = user?.role?.toLowerCase() || "";
-      if (role === "admin") navigate("/dashboard/admin");
-      else if (role === "medecin") navigate("/dashboard/medecin");
-      else navigate("/dashboard/patient");
-    } catch (err) {
-      setErreur(err.message || "Identifiants incorrects");
-    } finally {
-      setLoading(false);
-    }
+    alert(`Connexion réussie !\nEmail : ${form.email}`);
+    if (form.email.includes("admin")) {
+	  navigate("/dashboard/admin");
+    } else if (form.email.includes("medecin")) {
+	 navigate("/dashboard/medecin");
+    } else {
+	navigate("/dashboard/patient");
+}
   };
 
   return (
@@ -213,16 +203,9 @@ export default function ConnexionPage() {
                 </span>
               </div>
 
-              {/* Message d'erreur */}
-              {erreur && (
-                <div style={{ background: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#c0392b" }}>
-                  {erreur}
-                </div>
-              )}
-
               {/* Bouton connexion */}
-              <button type="submit" className="btn-submit" disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
-                {loading ? "Connexion en cours..." : "Se connecter"}
+              <button type="submit" className="btn-submit">
+                Se connecter
               </button>
 
               {/* Divider */}
