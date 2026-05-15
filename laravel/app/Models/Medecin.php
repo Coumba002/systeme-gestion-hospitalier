@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Medecin extends Model
 {
     protected $fillable = [
+        'user_id',
         'nom',
         'prenom',
         'specialite',
@@ -23,5 +24,10 @@ class Medecin extends Model
     public function rendezVous()
     {
         return $this->hasMany(RendezVous::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

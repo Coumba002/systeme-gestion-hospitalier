@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUser, logout } from "./api";
+import { getStatsPatient, getRendezVous, getPrescriptions, getResultats, getMessages } from "./api";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -98,49 +99,6 @@ const menuItems = [
   { icon: "💬", label: "Messagerie", key: "messagerie" },
 ];
 
-const tousRdvs = [
-  { day: "30", month: "Avr", heure: "10h00", medecin: "Dr. Diallo B.", type: "Consultation de suivi", lieu: "Cabinet 3 · Bâtiment A", statut: "confirme" },
-  { day: "05", month: "Mai", heure: "14h30", medecin: "Dr. Fall A.", type: "Analyse sanguine", lieu: "Labo · Rez-de-chaussée", statut: "attente" },
-  { day: "12", month: "Mai", heure: "09h00", medecin: "Dr. Sow M.", type: "Contrôle glycémie", lieu: "Cabinet 7 · Bâtiment B", statut: "confirme" },
-  { day: "20", month: "Mai", heure: "11h00", medecin: "Dr. Diallo B.", type: "Renouvellement ordonnance", lieu: "Cabinet 3 · Bâtiment A", statut: "attente" },
-];
-
-const ordonnances = [
-  { med: "Metformine 500mg", freq: "2× par jour, après les repas", exp: "30 mai 2026", color: "#0f6e56", statut: "actif", prescrit: "Dr. Diallo B.", date: "01 avr. 2026" },
-  { med: "Vitamine D 1000UI", freq: "1× par jour, le matin", exp: "15 juin 2026", color: "#0a5c8a", statut: "actif", prescrit: "Dr. Diallo B.", date: "01 avr. 2026" },
-  { med: "Amlodipine 5mg", freq: "1× le soir", exp: "10 mai 2026", color: "#ef9f27", statut: "actif", prescrit: "Dr. Fall A.", date: "15 mars 2026" },
-  { med: "Ibuprofène 400mg", freq: "Si douleur, max 3×/jour", exp: "Expiré", color: "#c0392b", statut: "expire", prescrit: "Dr. Diallo B.", date: "01 janv. 2026" },
-];
-
-const resultats = [
-  { nom: "Glycémie à jeun", date: "20 avr. 2026", valeur: "5.6 mmol/L", ref: "< 6.1", statut: "vert", label: "Normal" },
-  { nom: "Bilan lipidique", date: "18 avr. 2026", valeur: "LDL 3.4 mmol/L", ref: "< 3.0", statut: "orange", label: "À surveiller" },
-  { nom: "NFS complète", date: "15 avr. 2026", valeur: "Hb 12.8 g/dL", ref: "12–16", statut: "vert", label: "Normal" },
-  { nom: "Créatinine", date: "10 avr. 2026", valeur: "En cours", ref: "< 90", statut: "bleu", label: "En cours" },
-  { nom: "HbA1c", date: "01 avr. 2026", valeur: "7.2%", ref: "< 7.0", statut: "orange", label: "À surveiller" },
-];
-
-const convMessages = [
-  { initials: "DB", bg: "#e6f7f2", tc: "#0f6e56", name: "Dr. Diallo B.", role: "Médecin traitant", statut: "vert", preview: "Vos résultats sont disponibles...", time: "Il y a 1h", unread: true,
-    conv: [
-      { dir: "in", text: "Bonjour, vos résultats d'examens sont disponibles. Votre glycémie est dans la norme mais le bilan lipidique mérite un suivi.", time: "Il y a 1h" },
-      { dir: "out", text: "Merci Docteur. Est-ce que je dois modifier mon traitement ?", time: "Il y a 45 min" },
-      { dir: "in", text: "Pas pour l'instant. Continuez votre traitement habituel et on en reparlera lors de votre rendez-vous du 30 avril.", time: "Il y a 30 min" },
-    ]
-  },
-  { initials: "FA", bg: "#eef6fb", tc: "#0a5c8a", name: "Dr. Fall A.", role: "Cardiologue", statut: "bleu", preview: "RDV confirmé pour le 5 mai", time: "Hier", unread: false,
-    conv: [
-      { dir: "in", text: "Bonjour, votre rendez-vous pour l'analyse sanguine est confirmé pour le 5 mai à 14h30. Merci de venir à jeun.", time: "Hier" },
-      { dir: "out", text: "Très bien, merci pour la confirmation. Je serai présent(e).", time: "Hier" },
-    ]
-  },
-  { initials: "KH", bg: "#f3efff", tc: "#7c3aed", name: "KDG Health", role: "Notifications système", statut: "orange", preview: "Rappel : rendez-vous demain à 10h", time: "Hier", unread: false,
-    conv: [
-      { dir: "in", text: "Rappel automatique : vous avez un rendez-vous demain 30 avril à 10h00 avec Dr. Diallo B. Cabinet 3, Bâtiment A.", time: "Hier" },
-    ]
-  },
-];
-
 function Badge({ statut, label }) {
   const map = { vert: "badge-vert", bleu: "badge-bleu", orange: "badge-orange", rouge: "badge-rouge", confirme: "badge-vert", attente: "badge-orange", actif: "badge-vert", expire: "badge-rouge" };
   const lblMap = { confirme: "Confirmé", attente: "En attente", actif: "Actif", expire: "Expiré" };
@@ -148,6 +106,24 @@ function Badge({ statut, label }) {
 }
 
 function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhui }) {
+  const [stats, setStats] = React.useState(null);
+  const [rdvs, setRdvs] = React.useState([]);
+  const [ordonnances, setOrdonnances] = React.useState([]);
+  const [resultats, setResultats] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [s, r, o, rs] = await Promise.all([getStatsPatient(), getRendezVous(), getPrescriptions(), getResultats()]);
+        setStats(s);
+        setRdvs(Array.isArray(r) ? r : r.data || []);
+        setOrdonnances(Array.isArray(o) ? o : o.data || []);
+        setResultats(Array.isArray(rs) ? rs : rs.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="topbar">
@@ -163,9 +139,9 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
 
       <div className="stats-grid">
         {[
-          { icon: "📅", bg: "#e6f7f2", value: "2", label: "Prochains rendez-vous" },
-          { icon: "💊", bg: "#eef6fb", value: "3", label: "Ordonnances actives" },
-          { icon: "🔬", bg: "#f3efff", value: "5", label: "Résultats disponibles" },
+          { icon: "📅", bg: "#e6f7f2", value: stats?.rdv_a_venir || 0, label: "Prochains rendez-vous" },
+          { icon: "💊", bg: "#eef6fb", value: stats?.ordonnances_actives || 0, label: "Ordonnances actives" },
+          { icon: "🔬", bg: "#f3efff", value: stats?.resultats_recents || 0, label: "Résultats disponibles" },
           { icon: "👨‍⚕️", bg: "#fef3e2", value: "1", label: "Médecin traitant" },
         ].map((s, i) => (
           <div key={i} className="stat-card">
@@ -179,19 +155,22 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
       <div className="grid-2">
         <div className="card">
           <div className="card-title">Mes prochains rendez-vous <span className="card-link" onClick={() => setActiveMenu("rdv")}>Voir tout →</span></div>
-          {tousRdvs.slice(0, 2).map((r, i) => (
-            <div key={i} className="rdv-card">
-              <div className="rdv-date-block">
-                <div className="rdv-day">{r.day}</div>
-                <div className="rdv-month">{r.month}</div>
+          {rdvs.slice(0, 2).map((r, i) => {
+            const date = new Date(r.date_heure);
+            return (
+              <div key={i} className="rdv-card">
+                <div className="rdv-date-block">
+                  <div className="rdv-day">{date.getDate()}</div>
+                  <div className="rdv-month">{date.toLocaleString('fr-FR', {month: 'short'})}</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Dr. #{r.medecin_id}</div>
+                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.motif} · {date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
+                </div>
+                <Badge statut={r.statut} />
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>{r.medecin}</div>
-                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.type} · {r.heure}</div>
-              </div>
-              <Badge statut={r.statut} />
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="card">
@@ -214,10 +193,9 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           {resultats.slice(0, 4).map((r, i) => (
             <div key={i} className="result-item">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.nom}</div>
-                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.date}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.type_examen}</div>
+                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_examen).toLocaleDateString()}</div>
               </div>
-              <Badge statut={r.statut} label={r.label} />
             </div>
           ))}
         </div>
@@ -226,28 +204,15 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           <div className="card-title">Mes ordonnances <span className="card-link" onClick={() => setActiveMenu("ordonnances")}>Voir →</span></div>
           {ordonnances.slice(0, 3).map((o, i) => (
             <div key={i} style={{ padding: "10px 0", borderBottom: i < 2 ? "1px solid #f0f4f8" : "none" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>{o.med}</div>
-              <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{o.freq}</div>
-              <div style={{ fontSize: 10, color: "#0f6e56", marginTop: 4, fontWeight: 600 }}>Expire le {o.exp}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>{o.medicaments}</div>
+              <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>Dr. #{o.medecin_id}</div>
+              <div style={{ fontSize: 10, color: "#0f6e56", marginTop: 4, fontWeight: 600 }}>Le {new Date(o.created_at).toLocaleDateString()}</div>
             </div>
           ))}
         </div>
 
         <div className="card">
-          <div className="card-title">Messagerie <span style={{ background: "#0f6e56", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10 }}>1 nouveau</span></div>
-          {convMessages.map((m, i) => (
-            <div key={i} className="msg-item">
-              <div className="msg-avatar" style={{ background: m.bg, color: m.tc }}>{m.initials}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{m.name}</span>
-                  {m.unread && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#0f6e56" }} />}
-                </div>
-                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{m.preview}</div>
-              </div>
-              <div style={{ fontSize: 10, color: "#a0b0bc", whiteSpace: "nowrap" }}>{m.time}</div>
-            </div>
-          ))}
+          <div className="card-title">Messagerie <span className="card-link" onClick={() => setActiveMenu("messagerie")}>Voir →</span></div>
         </div>
       </div>
     </>
@@ -255,36 +220,46 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
 }
 
 function SectionRdv() {
+  const [rdvs, setRdvs] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const r = await getRendezVous();
+        setRdvs(Array.isArray(r) ? r : r.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Mes rendez-vous</div>
       <div className="pg-sub-text">Consultations et examens programmés</div>
-      <div className="alert-card alert-vert" style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f6e56" }}>Prochain rendez-vous dans 2 jours</div>
-        <div style={{ fontSize: 12, color: "#1a9e75", marginTop: 3 }}>Dr. Diallo B. · 30 avril 2026 à 10h00 · Cabinet 3, Bâtiment A</div>
-      </div>
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-title">Rendez-vous à venir</div>
-        {tousRdvs.map((r, i) => (
-          <div key={i} className="rdv-card">
-            <div className="rdv-date-block">
-              <div className="rdv-day">{r.day}</div>
-              <div className="rdv-month">{r.month}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{r.medecin}</div>
-              <div style={{ fontSize: 12, color: "#4a6070", marginTop: 3 }}>{r.type}</div>
-              <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
-                <span style={{ fontSize: 11, color: "#7a90a0" }}>🕐 {r.heure}</span>
-                <span style={{ fontSize: 11, color: "#7a90a0" }}>📍 {r.lieu}</span>
+        {rdvs.map((r, i) => {
+          const date = new Date(r.date_heure);
+          return (
+            <div key={i} className="rdv-card">
+              <div className="rdv-date-block">
+                <div className="rdv-day">{date.getDate()}</div>
+                <div className="rdv-month">{date.toLocaleString('fr-FR', {month: 'short'})}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>Dr. #{r.medecin_id}</div>
+                <div style={{ fontSize: 12, color: "#4a6070", marginTop: 3 }}>{r.motif}</div>
+                <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
+                  <span style={{ fontSize: 11, color: "#7a90a0" }}>🕐 {date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                <Badge statut={r.statut} />
+                <span className="card-link" style={{ fontSize: 11 }}>Annuler</span>
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-              <Badge statut={r.statut} />
-              <span className="card-link" style={{ fontSize: 11 }}>Annuler</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="card">
         <div className="card-title">Historique des consultations</div>
@@ -402,24 +377,31 @@ function SectionDossier({ prenom, nom, initiales }) {
 }
 
 function SectionOrdonnances() {
+  const [ordonnances, setOrdonnances] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const o = await getPrescriptions();
+        setOrdonnances(Array.isArray(o) ? o : o.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Mes ordonnances</div>
-      <div className="pg-sub-text">3 ordonnances actives · 1 expirée</div>
+      <div className="pg-sub-text">Toutes mes ordonnances</div>
       <div className="grid-2">
         <div>
           {ordonnances.map((o, i) => (
-            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 18, marginBottom: 14, borderLeft: `4px solid ${o.color}` }}>
+            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 18, marginBottom: 14, borderLeft: `4px solid #0f6e56` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>{o.med}</div>
-                <Badge statut={o.statut} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                <div className="info-item" style={{ padding: "7px 10px" }}><div className="info-label">Fréquence</div><div style={{ fontSize: 12, fontWeight: 600, color: "#0d1f2d" }}>{o.freq}</div></div>
-                <div className="info-item" style={{ padding: "7px 10px" }}><div className="info-label">Expiration</div><div style={{ fontSize: 12, fontWeight: 600, color: o.statut === "expire" ? "#c0392b" : "#0d1f2d" }}>{o.exp}</div></div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>{o.medicaments}</div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 11, color: "#7a90a0" }}>Prescrit par {o.prescrit} · {o.date}</div>
+                <div style={{ fontSize: 11, color: "#7a90a0" }}>Prescrit par Dr. #{o.medecin_id} · Le {new Date(o.created_at).toLocaleDateString()}</div>
                 <button className="btn-primary" style={{ fontSize: 11, padding: "5px 12px" }}>Télécharger</button>
               </div>
             </div>
@@ -453,10 +435,22 @@ function SectionOrdonnances() {
 
 function SectionResultats() {
   const [selected, setSelected] = useState(null);
+  const [resultats, setResultats] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const rs = await getResultats();
+        setResultats(Array.isArray(rs) ? rs : rs.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Résultats d'examens</div>
-      <div className="pg-sub-text">5 résultats disponibles · 1 en cours</div>
+      <div className="pg-sub-text">Mes résultats d'examens</div>
       <div className="grid-2">
         <div className="card">
           <div className="card-title">Tous mes résultats</div>
@@ -464,21 +458,16 @@ function SectionResultats() {
             <div key={i}>
               <div className="result-item" onClick={() => setSelected(selected === i ? null : i)}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.nom}</div>
-                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.date}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.type_examen}</div>
+                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_examen).toLocaleDateString()}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <Badge statut={r.statut} label={r.label} />
                   <span style={{ fontSize: 10, color: "#0f6e56", fontWeight: 600 }}>{selected === i ? "Fermer ▲" : "Voir ▼"}</span>
                 </div>
               </div>
               {selected === i && (
                 <div style={{ margin: "0 0 8px", background: "#f9fbfc", borderRadius: 8, padding: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                    <div><div style={{ fontSize: 10, color: "#7a90a0", fontWeight: 600, textTransform: "uppercase" }}>Résultat</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d", marginTop: 2 }}>{r.valeur}</div></div>
-                    <div><div style={{ fontSize: 10, color: "#7a90a0", fontWeight: 600, textTransform: "uppercase" }}>Référence</div><div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d", marginTop: 2 }}>{r.ref}</div></div>
-                    <div><div style={{ fontSize: 10, color: "#7a90a0", fontWeight: 600, textTransform: "uppercase" }}>Statut</div><div style={{ marginTop: 4 }}><Badge statut={r.statut} label={r.label} /></div></div>
-                  </div>
+                  <div style={{ fontSize: 13, color: "#0d1f2d" }}>{r.interpretation}</div>
                 </div>
               )}
             </div>
@@ -516,54 +505,39 @@ function SectionResultats() {
 }
 
 function SectionMessagerie() {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [draft, setDraft] = useState("");
-  const selected = convMessages[selectedIdx];
+  const [messages, setMessages] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const m = await getMessages();
+        setMessages(Array.isArray(m) ? m : m.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Messagerie</div>
-      <div className="pg-sub-text">Échangez en toute sécurité avec votre équipe médicale</div>
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 20 }}>
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0f4f8" }}><span style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Mes conversations</span></div>
-          {convMessages.map((m, i) => (
-            <div key={i} className={`thread-item${selectedIdx === i ? " selected" : ""}`} onClick={() => setSelectedIdx(i)}>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: m.tc, flexShrink: 0 }}>{m.initials}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0d1f2d" }}>{m.name}</span>
-                    <span style={{ fontSize: 10, color: "#a0b0bc" }}>{m.time}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#7a90a0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.preview}</div>
-                </div>
-                {m.unread && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#0f6e56", marginTop: 6, flexShrink: 0 }} />}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="card" style={{ display: "flex", flexDirection: "column", minHeight: 460 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 14, borderBottom: "1px solid #f0f4f8", marginBottom: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: selected.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: selected.tc }}>{selected.initials}</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{selected.name}</div>
-              <div style={{ fontSize: 11, color: "#7a90a0" }}>{selected.role}</div>
-            </div>
-          </div>
+      <div className="pg-sub-text">Échangez avec votre médecin</div>
+      <div className="card" style={{ display: "flex", flexDirection: "column", minHeight: 460 }}>
+        {messages.length === 0 ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#7a90a0" }}>Aucun message</div>
+        ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-            {selected.conv.map((msg, i) => (
-              <div key={i} style={{ alignSelf: msg.dir === "out" ? "flex-end" : "flex-start", maxWidth: "70%" }}>
-                <div className={msg.dir === "out" ? "msg-bubble-out" : "msg-bubble-in"}>{msg.text}</div>
-                <div style={{ fontSize: 10, color: "#a0b0bc", marginTop: 3, textAlign: msg.dir === "out" ? "right" : "left" }}>{msg.time}</div>
-              </div>
-            ))}
+            {messages.map((msg, i) => {
+              const user = getUser();
+              const isOut = msg.sender_id === user?.id;
+              return (
+                <div key={i} style={{ alignSelf: isOut ? "flex-end" : "flex-start", maxWidth: "70%" }}>
+                  <div className={isOut ? "msg-bubble-out" : "msg-bubble-in"}>{msg.content}</div>
+                  <div style={{ fontSize: 10, color: "#a0b0bc", marginTop: 3, textAlign: isOut ? "right" : "left" }}>{new Date(msg.created_at).toLocaleString()}</div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ display: "flex", gap: 10, borderTop: "1px solid #f0f4f8", paddingTop: 14 }}>
-            <input type="text" placeholder="Écrire un message..." value={draft} onChange={e => setDraft(e.target.value)}
-              style={{ flex: 1, padding: "9px 16px", border: "1px solid #e8edf2", borderRadius: 22, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", outline: "none" }} />
-            <button className="btn-primary" style={{ borderRadius: 22, padding: "9px 20px" }}>Envoyer</button>
-          </div>
-        </div>
+        )}
       </div>
     </>
   );
@@ -574,18 +548,23 @@ export default function DashboardPatient() {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [user, setUser] = useState(null);
 
+  const [now, setNow] = useState(new Date());
+
   useEffect(() => {
     const u = getUser();
     if (!u) { navigate("/connexion"); return; }
     setUser(u);
-  }, []);
+
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [navigate]);
 
   const handleLogout = () => { logout(); navigate("/connexion"); };
 
   const prenom = user?.prenom || user?.name?.split(" ")[0] || "Patient";
   const nom = user?.nom || user?.name?.split(" ")[1] || "";
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase();
-  const dateAujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
 
   const renderSection = () => {
     switch (activeMenu) {

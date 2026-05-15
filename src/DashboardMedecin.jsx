@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import MedecinConsultations from "./sections/MedecinConsultations";
+import { getStatsMedecin, getPatients, getRendezVous, getMessages, getPrescriptions, getUser, logout } from "./api";
  
 // ─── STYLES GLOBAUX ───────────────────────────────────────────────────────────
 const globalStyles = `
@@ -106,77 +108,16 @@ const globalStyles = `
   .cal-cell.has-rdv { font-weight: 700; color: #0a5c8a; }
   .cal-cell.today.has-rdv { color: #fff; }
 `;
- 
-// ─── DONNÉES ──────────────────────────────────────────────────────────────────
-const patients = [
-  { id: "SGH-2024-0041", initiales: "FN", bg: "#eef6fb", tc: "#0a5c8a", nom: "Fatou Ndiaye", age: 48, diagnostic: "Diabète type 2", chambre: "204-A", derniere: "Aujourd'hui", statut: "stable" },
-  { id: "SGH-2024-0089", initiales: "IS", bg: "#fdeaea", tc: "#c0392b", nom: "Ibrahima Sarr", age: 62, diagnostic: "Infarctus du myocarde", chambre: "107-B", derniere: "Il y a 2h", statut: "urgent" },
-  { id: "SGH-2024-0093", initiales: "AS", bg: "#fdeaea", tc: "#c0392b", nom: "Aminata Sy", age: 33, diagnostic: "Appendicite aiguë", chambre: "Urgences", derniere: "Il y a 1h", statut: "urgent" },
-  { id: "SGH-2024-0112", initiales: "MT", bg: "#fef3e2", tc: "#854f0b", nom: "Moussa Touré", age: 55, diagnostic: "Hypertension artérielle", chambre: "312-C", derniere: "Hier", statut: "attente" },
-  { id: "SGH-2024-0118", initiales: "AC", bg: "#e6f7f2", tc: "#0f6e56", nom: "Aïssatou Ciss", age: 27, diagnostic: "Post-opératoire", chambre: "205-A", derniere: "Ce matin", statut: "stable" },
-  { id: "SGH-2024-0124", initiales: "OD", bg: "#eef6fb", tc: "#0a5c8a", nom: "Omar Diouf", age: 41, diagnostic: "Pneumonie", chambre: "118-A", derniere: "Il y a 3j", statut: "stable" },
-  { id: "SGH-2024-0131", initiales: "KF", bg: "#f3efff", tc: "#7c3aed", nom: "Khady Fall", age: 36, diagnostic: "Anémie ferriprive", chambre: "Externe", derniere: "Il y a 5j", statut: "attente" },
-];
- 
-const rdvs = [
-  { time: "08h30", name: "Mamadou Gueye", type: "Consultation de suivi", color: "#0f6e56", statut: "stable" },
-  { time: "10h00", name: "Rokhaya Diop", type: "Bilan sanguin", color: "#0a5c8a", statut: "stable" },
-  { time: "11h30", name: "Seydou Fall", type: "Visite médicale", color: "#ef9f27", statut: "attente" },
-  { time: "14h00", name: "Ndèye Mbaye", type: "Résultats examens", color: "#d85a30", statut: "stable" },
-  { time: "15h30", name: "Aliou Ba", type: "Ordonnance renouvellement", color: "#7c3aed", statut: "attente" },
-];
- 
-const prochainRdvs = [
-  { date: "Mardi 5 mai", heure: "09h00", patient: "Fatou Ndiaye", type: "Contrôle glycémie", statut: "stable" },
-  { date: "Mardi 5 mai", heure: "11h00", patient: "Ibrahima Sarr", type: "Cardio suivi", statut: "urgent" },
-  { date: "Mercredi 6 mai", heure: "10h30", patient: "Omar Diouf", type: "Bilan pulmonaire", statut: "attente" },
-  { date: "Jeudi 7 mai", heure: "14h00", patient: "Khady Fall", type: "Résultats analyses", statut: "stable" },
-];
- 
-const messages = [
-  { initials: "FN", bg: "#eef6fb", tc: "#0a5c8a", name: "Fatou Ndiaye", role: "Patient · Chambre 204-A", statut: "stable", preview: "Docteur, j'ai une douleur depuis hier...", time: "Il y a 5 min", unread: true,
-    conv: [
-      { dir: "in", text: "Bonjour Docteur Diallo, j'ai une douleur au niveau du ventre depuis hier soir, est-ce normal avec mon traitement ?", time: "Il y a 5 min" },
-      { dir: "out", text: "Bonjour Madame Ndiaye. Ces douleurs peuvent être liées à la Metformine. Je vous recommande de prendre le médicament après les repas. Si la douleur persiste, venez me voir cet après-midi.", time: "Il y a 2 min · Lu ✓" },
-      { dir: "in", text: "D'accord docteur, merci beaucoup. Je ferai comme vous avez dit.", time: "À l'instant" },
-    ]
-  },
-  { initials: "IS", bg: "#fdeaea", tc: "#c0392b", name: "Ibrahima Sarr", role: "Patient · Chambre 107-B", statut: "urgent", preview: "Merci pour les résultats, est-ce que...", time: "Il y a 1h", unread: true,
-    conv: [
-      { dir: "out", text: "Bonjour Monsieur Sarr, vos résultats d'ECG sont revenus. Je vais passer vous voir dans l'heure.", time: "Il y a 2h" },
-      { dir: "in", text: "Merci pour les résultats, est-ce que c'est grave ? Je suis un peu inquiet.", time: "Il y a 1h" },
-    ]
-  },
-  { initials: "MS", bg: "#e6f7f2", tc: "#0f6e56", name: "Dr. Moussa Sow", role: "Collègue · Médecin interne", statut: "blue", preview: "Réunion de service confirmée à 14h", time: "Il y a 2h", unread: false,
-    conv: [
-      { dir: "in", text: "Bonjour Diallo, réunion de service confirmée à 14h en salle B. Ordre du jour : cas urgents de la semaine.", time: "Il y a 2h" },
-      { dir: "out", text: "Reçu, je serai présent. J'apporterai le dossier Sarr.", time: "Il y a 1h30 · Lu ✓" },
-    ]
-  },
-  { initials: "AM", bg: "#f3efff", tc: "#7c3aed", name: "Aminata Mbaye", role: "Patient · Externe", statut: "attente", preview: "Mon prochain rendez-vous est-il...", time: "Hier", unread: false,
-    conv: [
-      { dir: "in", text: "Bonjour docteur, mon prochain rendez-vous est-il toujours fixé au vendredi 8 mai ?", time: "Hier" },
-    ]
-  },
-];
- 
-const ordonnancesHistorique = [
-  { patient: "Fatou Ndiaye", med: "Metformine 500mg · 2×/jour · 30j", date: "04/05/2026", color: "#0f6e56", statut: "stable", label: "Délivrée" },
-  { patient: "Moussa Touré", med: "Amlodipine 5mg · 1×/jour · 60j", date: "03/05/2026", color: "#0a5c8a", statut: "stable", label: "Délivrée" },
-  { patient: "Rokhaya Diop", med: "Lévothyroxine 50µg · 1×/jour · 90j", date: "02/05/2026", color: "#ef9f27", statut: "attente", label: "En attente" },
-  { patient: "Aliou Ba", med: "Amoxicilline 1g · 3×/jour · 7j", date: "01/05/2026", color: "#7c3aed", statut: "stable", label: "Terminée" },
-];
- 
+
 const menuItems = [
   { icon: "🏠", label: "Tableau de bord", key: "dashboard" },
   { icon: "👥", label: "Mes patients", key: "patients" },
   { icon: "📅", label: "Rendez-vous", key: "rdv" },
+  { icon: "🔬", label: "Consultations", key: "consultations" },
   { icon: "📋", label: "Dossiers médicaux", key: "dossiers" },
   { icon: "💊", label: "Ordonnances", key: "ordonnances" },
   { icon: "💬", label: "Messagerie", key: "messagerie" },
 ];
- 
-const rdvDaysAvecRdv = [4, 5, 7, 9, 12, 14, 19, 21, 26];
  
 // ─── COMPOSANTS UTILITAIRES ───────────────────────────────────────────────────
 function Badge({ statut }) {
@@ -200,26 +141,42 @@ function Avatar({ initiales, bg, tc, size = 36 }) {
 }
  
 // ─── SECTION : TABLEAU DE BORD ────────────────────────────────────────────────
-function SectionDashboard({ setActiveMenu }) {
+function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhui }) {
+  const [stats, setStats] = React.useState(null);
+  const [rdvs, setRdvs] = React.useState([]);
+  const [patients, setPatients] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [s, r, p] = await Promise.all([getStatsMedecin(), getRendezVous(), getPatients()]);
+        setStats(s);
+        setRdvs(Array.isArray(r) ? r : r.data || []);
+        setPatients(Array.isArray(p) ? p : p.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="topbar">
         <div>
           <div className="page-title">Tableau de bord — Médecin</div>
-          <div className="page-sub">Lundi 4 mai 2026 · Service de médecine interne</div>
+          <div className="page-sub">{dateAujourdhui} · Service de médecine interne</div>
         </div>
         <div className="user-pill">
-          <div className="user-avatar">DB</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>Dr. Diallo B.</span>
+          <div className="user-avatar">{initiales}</div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
         </div>
       </div>
  
       <div className="stats-grid">
         {[
-          { icon: "👥", bg: "#eef6fb", value: "24", label: "Patients suivis", delta: "+3 ce mois", deltaColor: "#0f6e56" },
-          { icon: "📅", bg: "#e6f7f2", value: "5", label: "Rendez-vous aujourd'hui", delta: "2 restants", deltaColor: "#7a90a0" },
-          { icon: "🚨", bg: "#fdeaea", value: "2", label: "Cas urgents", delta: "Attention requise", deltaColor: "#c0392b" },
-          { icon: "💊", bg: "#f3efff", value: "8", label: "Ordonnances ce mois", delta: "+2 cette semaine", deltaColor: "#0f6e56" },
+          { icon: "👥", bg: "#eef6fb", value: stats?.patients_suivis || 0, label: "Patients suivis", delta: "Actifs", deltaColor: "#0f6e56" },
+          { icon: "📅", bg: "#e6f7f2", value: stats?.rdv_a_venir || 0, label: "Rendez-vous à venir", delta: "Planifiés", deltaColor: "#7a90a0" },
+          { icon: "🚨", bg: "#fdeaea", value: stats?.cas_urgents || 0, label: "Cas urgents", delta: "Attention requise", deltaColor: "#c0392b" },
+          { icon: "💊", bg: "#f3efff", value: stats?.ordonnances_emis || 0, label: "Ordonnances", delta: "Total", deltaColor: "#0f6e56" },
         ].map((s, i) => (
           <div key={i} className="stat-card">
             <div className="stat-icon" style={{ background: s.bg }}><span style={{ fontSize: 18 }}>{s.icon}</span></div>
@@ -234,14 +191,13 @@ function SectionDashboard({ setActiveMenu }) {
         <div className="card">
           <div className="card-title">Mes patients <span className="card-link" onClick={() => setActiveMenu("patients")}>Voir tout →</span></div>
           <table>
-            <thead><tr><th>Patient</th><th>Diagnostic</th><th>Chambre</th><th>Statut</th></tr></thead>
+            <thead><tr><th>Patient</th><th>Téléphone</th><th>Groupe Sanguin</th></tr></thead>
             <tbody>
               {patients.slice(0, 5).map((p, i) => (
                 <tr key={i}>
-                  <td><div style={{ fontWeight: 600 }}>{p.nom}</div><div style={{ fontSize: 11, color: "#7a90a0" }}>{p.age} ans</div></td>
-                  <td style={{ color: "#4a6070" }}>{p.diagnostic}</td>
-                  <td style={{ color: "#4a6070" }}>{p.chambre}</td>
-                  <td><Badge statut={p.statut} /></td>
+                  <td><div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div></td>
+                  <td style={{ color: "#4a6070" }}>{p.telephone}</td>
+                  <td style={{ color: "#4a6070" }}>{p.groupe_sanguin}</td>
                 </tr>
               ))}
             </tbody>
@@ -249,44 +205,10 @@ function SectionDashboard({ setActiveMenu }) {
         </div>
         <div className="card">
           <div className="card-title">Rendez-vous du jour <span className="card-link" onClick={() => setActiveMenu("rdv")}>Agenda →</span></div>
-          {rdvs.map((r, i) => (
+          {rdvs.slice(0,5).map((r, i) => (
             <div key={i} className="rdv-item">
-              <div className="rdv-dot" style={{ background: r.color }} />
-              <div><div className="rdv-time">{r.time}</div><div className="rdv-name">{r.name}</div><div className="rdv-type">{r.type}</div></div>
-            </div>
-          ))}
-        </div>
-      </div>
- 
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-title">
-            Messagerie
-            <span style={{ background: "#0a5c8a", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>2 nouveaux</span>
-          </div>
-          {messages.map((m, i) => (
-            <div key={i} className="msg-item">
-              <Avatar initiales={m.initials} bg={m.bg} tc={m.tc} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span className="msg-name">{m.name}</span>
-                  {m.unread && <div className="unread-dot" />}
-                </div>
-                <div className="msg-preview">{m.preview}</div>
-              </div>
-              <div className="msg-time">{m.time}</div>
-            </div>
-          ))}
-        </div>
-        <div className="card">
-          <div className="card-title">Ordonnances récentes</div>
-          {ordonnancesHistorique.map((o, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < 3 ? "1px solid #f0f4f8" : "none" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{o.patient}</div>
-                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{o.med.split(" · ")[0]}</div>
-              </div>
-              <div style={{ fontSize: 11, color: "#a0b0bc" }}>{o.date}</div>
+              <div className="rdv-dot" style={{ background: "#0f6e56" }} />
+              <div><div className="rdv-time">{new Date(r.date_heure).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</div><div className="rdv-name">Patient #{r.patient_id}</div><div className="rdv-type">{r.motif || 'Suivi'}</div></div>
             </div>
           ))}
         </div>
@@ -298,60 +220,54 @@ function SectionDashboard({ setActiveMenu }) {
 // ─── SECTION : MES PATIENTS ───────────────────────────────────────────────────
 function SectionPatients({ setActiveMenu }) {
   const [search, setSearch] = useState("");
-  const [filtre, setFiltre] = useState("tous");
- 
+  const [patients, setPatients] = useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const d = await getPatients();
+        setPatients(Array.isArray(d) ? d : d.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   const filtres = patients.filter(p => {
-    const matchSearch = p.nom.toLowerCase().includes(search.toLowerCase()) || p.diagnostic.toLowerCase().includes(search.toLowerCase());
-    const matchStatut = filtre === "tous" || p.statut === filtre;
-    return matchSearch && matchStatut;
+    const matchSearch = p.nom?.toLowerCase().includes(search.toLowerCase()) || p.prenom?.toLowerCase().includes(search.toLowerCase());
+    return matchSearch;
   });
  
   return (
     <>
       <div className="pg-header">Mes patients</div>
-      <div className="pg-sub-text">24 patients sous suivi actif</div>
+      <div className="pg-sub-text">{patients.length} patients sous suivi actif</div>
       <div className="search-bar">
         <input type="text" placeholder="Rechercher un patient..." value={search} onChange={e => setSearch(e.target.value)} />
-        <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}
-          value={filtre} onChange={e => setFiltre(e.target.value)}>
-          <option value="tous">Tous les statuts</option>
-          <option value="urgent">Urgent</option>
-          <option value="stable">Stable</option>
-          <option value="attente">En attente</option>
-        </select>
         <button className="btn-primary">+ Nouveau patient</button>
       </div>
       <div className="card">
         <table>
           <thead>
-            <tr><th>Patient</th><th>Âge</th><th>Diagnostic principal</th><th>Chambre</th><th>Dernière visite</th><th>Statut</th><th>Actions</th></tr>
+            <tr><th>Patient</th><th>Téléphone</th><th>Adresse</th><th>Sexe</th><th>Groupe Sanguin</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {filtres.map((p, i) => (
               <tr key={i}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Avatar initiales={p.initiales} bg={p.bg} tc={p.tc} size={32} />
-                    <div style={{ fontWeight: 600 }}>{p.nom}</div>
+                    <Avatar initiales={(p.nom||"A")[0] + (p.prenom||"A")[0]} bg="#eef6fb" tc="#0a5c8a" size={32} />
+                    <div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div>
                   </div>
                 </td>
-                <td>{p.age} ans</td>
-                <td>{p.diagnostic}</td>
-                <td>{p.chambre}</td>
-                <td style={{ color: "#7a90a0" }}>{p.derniere}</td>
-                <td><Badge statut={p.statut} /></td>
+                <td>{p.telephone}</td>
+                <td>{p.adresse}</td>
+                <td>{p.sexe}</td>
+                <td>{p.groupe_sanguin}</td>
                 <td><span className="card-link" onClick={() => setActiveMenu("dossiers")}>Dossier →</span></td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "0 4px" }}>
-        <span style={{ fontSize: 12, color: "#7a90a0" }}>Affichage 1–{filtres.length} sur 24 patients</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}>← Précédent</button>
-          <button className="btn-primary" style={{ padding: "6px 14px", fontSize: 12 }}>Suivant →</button>
-        </div>
       </div>
     </>
   );
@@ -359,49 +275,33 @@ function SectionPatients({ setActiveMenu }) {
  
 // ─── SECTION : RENDEZ-VOUS ────────────────────────────────────────────────────
 function SectionRdv() {
+  const [rdvs, setRdvs] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const r = await getRendezVous();
+        setRdvs(Array.isArray(r) ? r : r.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Rendez-vous</div>
-      <div className="pg-sub-text">Agenda du Dr. Diallo B. — Mai 2026</div>
+      <div className="pg-sub-text">Agenda Médecin</div>
       <div className="grid-2">
-        {/* Calendrier */}
-        <div className="card">
-          <div className="card-title">Calendrier — Mai 2026</div>
-          <div className="cal-grid">
-            {["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"].map(d => (
-              <div key={d} className="cal-day-label">{d}</div>
-            ))}
-          </div>
-          <div className="cal-grid">
-            {/* Mai 2026 commence un vendredi → 4 cases vides (Lu Ma Me Je) */}
-            {[...Array(4)].map((_, i) => <div key={"e" + i} />)}
-            {[...Array(31)].map((_, i) => {
-              const day = i + 1;
-              const isToday = day === 4;
-              const hasRdv = rdvDaysAvecRdv.includes(day);
-              return (
-                <div key={day} className={`cal-cell${isToday ? " today" : ""}${hasRdv ? " has-rdv" : ""}`}>
-                  {day}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11, color: "#7a90a0" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 10, height: 10, background: "#0a5c8a", borderRadius: "50%", display: "inline-block" }} />Aujourd'hui</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 7, height: 7, background: "#0a5c8a", borderRadius: "50%", display: "inline-block" }} />Rendez-vous</span>
-          </div>
-        </div>
- 
         {/* RDV du jour */}
         <div className="card">
-          <div className="card-title">Aujourd'hui — Lundi 4 mai</div>
+          <div className="card-title">Aujourd'hui</div>
           {rdvs.map((r, i) => (
             <div key={i} className="rdv-item">
-              <div className="rdv-dot" style={{ background: r.color }} />
+              <div className="rdv-dot" style={{ background: "#0a5c8a" }} />
               <div style={{ flex: 1 }}>
-                <div className="rdv-time">{r.time}</div>
-                <div className="rdv-name">{r.name}</div>
-                <div className="rdv-type">{r.type}</div>
+                <div className="rdv-time">{new Date(r.date_heure).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</div>
+                <div className="rdv-name">Patient #{r.patient_id}</div>
+                <div className="rdv-type">{r.motif}</div>
               </div>
               <Badge statut={r.statut} />
             </div>
@@ -411,33 +311,25 @@ function SectionRdv() {
           </div>
         </div>
       </div>
- 
-      {/* Prochains RDV */}
-      <div className="card">
-        <div className="card-title">Prochains rendez-vous</div>
-        <table>
-          <thead><tr><th>Date</th><th>Heure</th><th>Patient</th><th>Type</th><th>Statut</th><th>Action</th></tr></thead>
-          <tbody>
-            {prochainRdvs.map((r, i) => (
-              <tr key={i}>
-                <td>{r.date}</td>
-                <td style={{ fontWeight: 600, color: "#0a5c8a" }}>{r.heure}</td>
-                <td style={{ fontWeight: 600 }}>{r.patient}</td>
-                <td style={{ color: "#4a6070" }}>{r.type}</td>
-                <td><Badge statut={r.statut} /></td>
-                <td><span className="card-link">Modifier</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </>
   );
 }
  
 // ─── SECTION : DOSSIERS MÉDICAUX ──────────────────────────────────────────────
 function SectionDossiers() {
-  const [activeTab, setActiveTab] = useState("info");
+  const [activeTab, setActiveTab] = React.useState("info");
+  const [patients, setPatients] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const d = await getPatients();
+        setPatients(Array.isArray(d) ? d : d.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   const tabs = [
     { key: "info", label: "Infos générales" },
     { key: "antecedents", label: "Antécédents" },
@@ -522,16 +414,15 @@ function SectionDossiers() {
       </div>
  
       {/* Autres dossiers réduits */}
-      {patients.slice(1, 4).map((p, i) => (
+      {patients.slice(0, 4).map((p, i) => (
         <div key={i} className="card" style={{ marginBottom: 10, cursor: "pointer", opacity: 0.75, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Avatar initiales={p.initiales} bg={p.bg} tc={p.tc} size={44} />
+            <Avatar initiales={(p.nom||"A")[0] + (p.prenom||"A")[0]} bg="#eef6fb" tc="#0a5c8a" size={44} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{p.nom}</div>
-              <div style={{ fontSize: 12, color: "#7a90a0" }}>ID: {p.id} · Chambre {p.chambre}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{p.nom} {p.prenom}</div>
+              <div style={{ fontSize: 12, color: "#7a90a0" }}>ID: {p.id}</div>
             </div>
           </div>
-          <Badge statut={p.statut} />
         </div>
       ))}
     </>
@@ -540,6 +431,20 @@ function SectionDossiers() {
  
 // ─── SECTION : ORDONNANCES ────────────────────────────────────────────────────
 function SectionOrdonnances() {
+  const [patients, setPatients] = React.useState([]);
+  const [prescriptions, setPrescriptions] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [p, pr] = await Promise.all([getPatients(), getPrescriptions()]);
+        setPatients(Array.isArray(p) ? p : p.data || []);
+        setPrescriptions(Array.isArray(pr) ? pr : pr.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Ordonnances</div>
@@ -552,7 +457,7 @@ function SectionOrdonnances() {
             <div className="form-group">
               <label>Patient</label>
               <select>
-                {patients.map(p => <option key={p.id}>{p.nom}</option>)}
+                {patients.map(p => <option key={p.id}>{p.nom} {p.prenom}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -588,19 +493,16 @@ function SectionOrdonnances() {
         <div className="card">
           <div className="card-title">Historique des ordonnances</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {ordonnancesHistorique.map((o, i) => (
-              <div key={i} style={{ background: "#f9fbfc", borderRadius: 8, padding: "12px 14px", borderLeft: `3px solid ${o.color}` }}>
+            {prescriptions.map((o, i) => (
+              <div key={i} style={{ background: "#f9fbfc", borderRadius: 8, padding: "12px 14px", borderLeft: `3px solid #0f6e56` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>{o.patient}</div>
-                  <span style={{ fontSize: 11, color: "#a0b0bc" }}>{o.date}</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Patient #{o.patient_id}</div>
+                  <span style={{ fontSize: 11, color: "#a0b0bc" }}>{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <div style={{ fontSize: 12, color: "#4a6070", marginTop: 4 }}>{o.med}</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                  <Badge statut={o.statut} />
-                  <span className="card-link" style={{ fontSize: 11 }}>Renouveler</span>
-                </div>
+                <div style={{ fontSize: 12, color: "#4a6070", marginTop: 4 }}>{o.medicaments}</div>
               </div>
             ))}
+            {prescriptions.length === 0 && <div style={{color:"#7a90a0", fontSize:13}}>Aucune ordonnance</div>}
           </div>
         </div>
       </div>
@@ -610,73 +512,38 @@ function SectionOrdonnances() {
  
 // ─── SECTION : MESSAGERIE ─────────────────────────────────────────────────────
 function SectionMessagerie() {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [draft, setDraft] = useState("");
-  const selected = messages[selectedIdx];
- 
+  const [messages, setMessages] = React.useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const m = await getMessages();
+        setMessages(Array.isArray(m) ? m : m.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Messagerie</div>
       <div className="pg-sub-text">Communications internes et messages patients</div>
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 20 }}>
- 
-        {/* Liste conversations */}
-        <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0f4f8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Conversations</span>
-            <button className="btn-primary" style={{ padding: "4px 12px", fontSize: 11 }}>+ Nouveau</button>
-          </div>
-          {messages.map((m, i) => (
-            <div key={i} className={`thread-item${selectedIdx === i ? " selected" : ""}`} onClick={() => setSelectedIdx(i)}>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <Avatar initiales={m.initials} bg={m.bg} tc={m.tc} size={36} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="msg-name">{m.name}</span>
-                    <span style={{ fontSize: 10, color: "#a0b0bc" }}>{m.time}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#7a90a0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.preview}</div>
-                </div>
-                {m.unread && <div className="unread-dot" style={{ marginTop: 6 }} />}
-              </div>
-            </div>
-          ))}
-        </div>
- 
-        {/* Fil de conversation */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", minHeight: 460 }}>
-          {/* En-tête */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 14, borderBottom: "1px solid #f0f4f8", marginBottom: 16 }}>
-            <Avatar initiales={selected.initials} bg={selected.bg} tc={selected.tc} size={40} />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{selected.name}</div>
-              <div style={{ fontSize: 11, color: "#7a90a0" }}>{selected.role}</div>
-            </div>
-            <div style={{ marginLeft: "auto" }}><Badge statut={selected.statut} /></div>
-          </div>
- 
-          {/* Messages */}
+      <div className="card" style={{ display: "flex", flexDirection: "column", minHeight: 460 }}>
+        {messages.length === 0 ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#7a90a0" }}>Aucun message</div>
+        ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-            {selected.conv.map((msg, i) => (
-              <div key={i} style={{ alignSelf: msg.dir === "out" ? "flex-end" : "flex-start", maxWidth: "70%" }}>
-                <div className={`msg-bubble ${msg.dir === "out" ? "msg-bubble-out" : "msg-bubble-in"}`}>{msg.text}</div>
-                <div style={{ fontSize: 10, color: "#a0b0bc", marginTop: 3, textAlign: msg.dir === "out" ? "right" : "left" }}>{msg.time}</div>
-              </div>
-            ))}
+            {messages.map((msg, i) => {
+              const isOut = msg.sender_id === getUser()?.id;
+              return (
+                <div key={i} style={{ alignSelf: isOut ? "flex-end" : "flex-start", maxWidth: "70%" }}>
+                  <div className={`msg-bubble ${isOut ? "msg-bubble-out" : "msg-bubble-in"}`}>{msg.content}</div>
+                  <div style={{ fontSize: 10, color: "#a0b0bc", marginTop: 3, textAlign: isOut ? "right" : "left" }}>{new Date(msg.created_at).toLocaleString()}</div>
+                </div>
+              );
+            })}
           </div>
- 
-          {/* Zone de saisie */}
-          <div style={{ display: "flex", gap: 10, borderTop: "1px solid #f0f4f8", paddingTop: 14 }}>
-            <input
-              type="text"
-              placeholder="Écrire un message..."
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              style={{ flex: 1, padding: "9px 16px", border: "1px solid #e8edf2", borderRadius: 22, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", outline: "none" }}
-            />
-            <button className="btn-primary" style={{ borderRadius: 22, padding: "9px 20px" }}>Envoyer</button>
-          </div>
-        </div>
+        )}
       </div>
     </>
   );
@@ -686,12 +553,29 @@ function SectionMessagerie() {
 export default function DashboardMedecin() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
- 
+  const [user, setUser] = useState(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const u = getUser();
+    if (!u) { navigate("/connexion"); return; }
+    setUser(u);
+
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  const prenom = user?.prenom || user?.name?.split(" ")[0] || "Dr.";
+  const nom = user?.nom || user?.name?.split(" ")[1] || "Médecin";
+  const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "DR";
+  const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
+
   const renderSection = () => {
     switch (activeMenu) {
-      case "dashboard":    return <SectionDashboard setActiveMenu={setActiveMenu} />;
+      case "dashboard":    return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} />;
       case "patients":     return <SectionPatients setActiveMenu={setActiveMenu} />;
       case "rdv":          return <SectionRdv />;
+      case "consultations":return <MedecinConsultations />;
       case "dossiers":     return <SectionDossiers />;
       case "ordonnances":  return <SectionOrdonnances />;
       case "messagerie":   return <SectionMessagerie />;
@@ -734,13 +618,13 @@ export default function DashboardMedecin() {
  
           <div className="sidebar-footer">
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 4 }}>
-              <div className="user-avatar">DB</div>
+              <div className="user-avatar">{initiales}</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Dr. Diallo B.</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{prenom} {nom}</div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Médecin généraliste</div>
               </div>
             </div>
-            <button className="logout-btn" onClick={() => navigate("/connexion")}>
+            <button className="logout-btn" onClick={() => { logout(); navigate("/connexion"); }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>

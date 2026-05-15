@@ -4,91 +4,113 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Infirmier;
+use App\Models\User;
 use Illuminate\Http\Request;
-use OpenApi\Attributes as OA;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class InfirmierController extends Controller
 {
-    #[OA\Get(
-        path: "/infirmiers",
-        operationId: "getInfirmiersList",
-        tags: ["Infirmiers"],
-        summary: "Get list of infirmiers",
-        description: "Returns list of infirmiers"
-    )]
-    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
-        return \App\Http\Resources\InfirmierResource::collection(Infirmier::all());
+        return response()->json(Infirmier::with('user')->get());
     }
 
-    #[OA\Post(
-        path: "/infirmiers",
-        operationId: "storeInfirmier",
-        tags: ["Infirmiers"],
-        summary: "Create a new infirmier",
-        description: "Creates a new infirmier record",
-    )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ["nom", "prenom"],
-            properties: [
-                new OA\Property(property: "nom", type: "string", example: "Smith"),
-                new OA\Property(property: "prenom", type: "string", example: "Anna"),
-                new OA\Property(property: "telephone", type: "string", example: "0600000000"),
-                new OA\Property(property: "email", type: "string", format: "email", example: "anna@hospital.com")
-            ]
-        )
-    )]
-    #[OA\Response(response: 201, description: "Infirmier created")]
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nom' => 'required|string|max:255',
-            'prenom' => 'required|string|max:255',
-            'service' => 'nullable|string|max:255',
-            'telephone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:infirmiers,email|max:255',
+            'nom'          => 'required|string|max:255',
+            'prenom'       => 'required|string|max:255',
+            'service'      => 'nullable|string|max:255',
+            'telephone'    => 'nullable|string|max:255',
+            'email'        => 'nullable|email|unique:infirmiers,email|max:255',
             'numero_badge' => 'nullable|string|unique:infirmiers,numero_badge|max:255',
+            // Champs compte utilisateur
+            'email_compte' => 'nullable|email|unique:users,email|max:255',
+            'password'     => 'nullable|string|min:8',
         ]);
 
-        $infirmier = Infirmier::create($validated);
-        return new \App\Http\Resources\InfirmierResource($infirmier);
+        // Créer le compte User automatiquement (rôle infirmier)
+        $emailCompte = $validated['email_compte'] ?? $validated['email'] ?? null;
+        $user = null;
+        $password = null;
+
+        if ($emailCompte) {
+            if (!User::where('email', $emailCompte)->exists()) {
+                $roleId = \Illuminate\Support\Facades\DB::table('roles')->where('nom', 'infirmier')->value('id');
+                
+                $password = $validated['password'] ?? Str::random(12);
+                $user = User::create([
+                    'nom'       => $validated['nom'],
+                    'prenom'    => $validated['prenom'],
+                    'email'     => $emailCompte,
+                    'password'  => Hash::make($password),
+                    'telephone' => $validated['telephone'] ?? null,
+                    'role'      => 'infirmier',
+                    'role_id'   => $roleId ?? 4,
+                    'statut'    => 'actif',
+                ]);
+            }
+        }
+
+        $infirmier = Infirmier::create([
+            'user_id'      => $user?->id,
+            'nom'          => $validated['nom'],
+            'prenom'       => $validated['prenom'],
+            'service'      => $validated['service'] ?? null,
+            'telephone'    => $validated['telephone'] ?? null,
+            'email'        => $validated['email'] ?? null,
+            'numero_badge' => $validated['numero_badge'] ?? null,
+        ]);
+
+        $response = $infirmier->load('user')->toArray();
+
+        if ($user && !isset($validated['password'])) {
+            $response['compte_genere'] = [
+                'email'    => $user->email,
+                'password' => $password,
+                'message'  => 'Compte créé automatiquement. Veuillez communiquer ces identifiants à l\'infirmier(ère).',
+            ];
+        }
+
+        return response()->json($response, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Infirmier $infirmier)
     {
-        return new \App\Http\Resources\InfirmierResource($infirmier);
+        return response()->json($infirmier->load('user'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Infirmier $infirmier)
     {
         $validated = $request->validate([
-            'nom' => 'sometimes|required|string|max:255',
-            'prenom' => 'sometimes|required|string|max:255',
-            'service' => 'nullable|string|max:255',
-            'telephone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:infirmiers,email,' . $infirmier->id . '|max:255',
+            'nom'          => 'sometimes|required|string|max:255',
+            'prenom'       => 'sometimes|required|string|max:255',
+            'service'      => 'nullable|string|max:255',
+            'telephone'    => 'nullable|string|max:255',
+            'email'        => 'nullable|email|unique:infirmiers,email,' . $infirmier->id . '|max:255',
             'numero_badge' => 'nullable|string|unique:infirmiers,numero_badge,' . $infirmier->id . '|max:255',
         ]);
 
         $infirmier->update($validated);
-        return new \App\Http\Resources\InfirmierResource($infirmier);
+
+        if ($infirmier->user_id && $infirmier->user) {
+            $infirmier->user->update([
+                'nom'    => $validated['nom'] ?? $infirmier->user->nom,
+                'prenom' => $validated['prenom'] ?? $infirmier->user->prenom,
+            ]);
+        }
+
+        return response()->json($infirmier->load('user'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Infirmier $infirmier)
     {
+        if ($infirmier->user_id && $infirmier->user) {
+            $infirmier->user->update(['statut' => 'inactif']);
+        }
+
         $infirmier->delete();
-        return response()->json(['message' => 'Infirmier supprimé avec succès'], 200);
+        return response()->json(['message' => 'Infirmier(ère) supprimé(e) avec succès']);
     }
 }

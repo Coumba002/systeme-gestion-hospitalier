@@ -13,11 +13,13 @@ class UserSeeder extends Seeder
         // Récupérer les IDs des rôles
         $adminId    = DB::table('roles')->where('nom', 'admin')->value('id');
         $medecinId  = DB::table('roles')->where('nom', 'medecin')->value('id');
+        $infirmierId= DB::table('roles')->where('nom', 'infirmier')->value('id');
         $patientId  = DB::table('roles')->where('nom', 'patient')->value('id');
 
         DB::table('users')->insertOrIgnore([
             [
                 'role_id'  => $adminId,
+                'role'     => 'admin',
                 'nom'      => 'Diop',
                 'prenom'   => 'Mouhamed',
                 'email'    => 'admin@sgh.sn',
@@ -28,6 +30,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'role_id'  => $medecinId,
+                'role'     => 'medecin',
                 'nom'      => 'Kane',
                 'prenom'   => 'Amadou Habib',
                 'email'    => 'medecin@sgh.sn',
@@ -37,7 +40,19 @@ class UserSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
+                'role_id'  => $infirmierId,
+                'role'     => 'infirmier',
+                'nom'      => 'Sarr',
+                'prenom'   => 'Anna',
+                'email'    => 'infirmier@sgh.sn',
+                'password' => Hash::make('Infirmier@1234'),
+                'statut'   => 'actif',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
                 'role_id'  => $patientId,
+                'role'     => 'patient',
                 'nom'      => 'Dramé',
                 'prenom'   => 'Manétou',
                 'email'    => 'patient@sgh.sn',

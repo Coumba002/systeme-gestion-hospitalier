@@ -25,13 +25,16 @@ class AuthController extends Controller
         'telephone' => 'nullable|string|max:20',
     ]);
 
+    $patientRoleId = \Illuminate\Support\Facades\DB::table('roles')->where('nom', 'patient')->value('id');
+
     $user = User::create([
         'nom'      => $validated['nom'] ?? $validated['name'],
         'prenom'   => $validated['prenom'] ?? '',
         'email'    => $validated['email'],
         'password' => Hash::make($validated['password']),
         'telephone'=> $validated['telephone'] ?? null,
-        'role_id'  => 3, // patient
+        'role_id'  => $patientRoleId ?? 3, // patient
+        'role'     => 'patient',
     ]);
 
     $token = $user->createToken('auth_token')->plainTextToken;

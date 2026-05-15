@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Infirmier extends Model
 {
     protected $fillable = [
+        'user_id',
         'nom',
         'prenom',
         'service',
@@ -14,4 +15,9 @@ class Infirmier extends Model
         'email',
         'numero_badge',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

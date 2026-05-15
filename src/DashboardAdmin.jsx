@@ -1,5 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AdminConsultations from "./sections/AdminConsultations";
+import AdminHospitalisations from "./sections/AdminHospitalisations";
+import AdminFacturation from "./sections/AdminFacturation";
+import AdminInfirmiers from "./sections/AdminInfirmiers";
+import AdminUtilisateurs from "./sections/AdminUtilisateurs";
+import { getMedecins, createMedecin, deleteMedecin, getPatients, deletePatient, getStatsDashboard, getRendezVous, getUser, logout } from "./api";
 
 // ─── STYLES GLOBAUX ───────────────────────────────────────────────────────────
 const globalStyles = `
@@ -87,36 +93,15 @@ const globalStyles = `
 const menuItems = [
   { icon: "📊", label: "Tableau de bord", key: "dashboard" },
   { icon: "👨‍⚕️", label: "Gestion médecins", key: "medecins" },
+  { icon: "🩺", label: "Infirmiers", key: "infirmiers" },
   { icon: "👥", label: "Gestion patients", key: "patients" },
+  { icon: "🔬", label: "Consultations", key: "consultations" },
+  { icon: "🏥", label: "Hospitalisations", key: "hospitalisations" },
   { icon: "📅", label: "Rendez-vous", key: "rdv" },
+  { icon: "💰", label: "Facturation", key: "facturation" },
+  { icon: "👤", label: "Utilisateurs", key: "utilisateurs" },
   { icon: "📈", label: "Statistiques", key: "stats" },
   { icon: "📄", label: "Rapports", key: "rapports" },
-];
-
-const medecins = [
-  { initiales: "DB", bg: "#eef6fb", tc: "#0a5c8a", nom: "Dr. Diallo B.", specialite: "Médecine générale", patients: 24, rdv: 5, statut: "actif", tel: "+221 77 111 22 33" },
-  { initiales: "FA", bg: "#e6f7f2", tc: "#0f6e56", nom: "Dr. Fall A.", specialite: "Cardiologie", patients: 18, rdv: 3, statut: "actif", tel: "+221 77 222 33 44" },
-  { initiales: "SM", bg: "#f3efff", tc: "#7c3aed", nom: "Dr. Sow M.", specialite: "Pédiatrie", patients: 31, rdv: 7, statut: "actif", tel: "+221 77 333 44 55" },
-  { initiales: "BK", bg: "#f0f4f8", tc: "#7a90a0", nom: "Dr. Ba K.", specialite: "Chirurgie", patients: 12, rdv: 0, statut: "inactif", tel: "+221 77 444 55 66" },
-];
-
-const patients = [
-  { initiales: "FN", bg: "#eef6fb", tc: "#0a5c8a", nom: "Fatou Ndiaye", age: 48, medecin: "Dr. Diallo B.", chambre: "204-A", statut: "Hospitalisé", date: "28 avr. 2026" },
-  { initiales: "IS", bg: "#fdeaea", tc: "#c0392b", nom: "Ibrahima Sarr", age: 62, medecin: "Dr. Fall A.", chambre: "107-B", statut: "Urgent", date: "29 avr. 2026" },
-  { initiales: "MT", bg: "#fef3e2", tc: "#854f0b", nom: "Moussa Touré", age: 55, medecin: "Dr. Sow M.", chambre: "312-C", statut: "En attente", date: "27 avr. 2026" },
-  { initiales: "AC", bg: "#e6f7f2", tc: "#0f6e56", nom: "Aïssatou Ciss", age: 27, medecin: "Dr. Ba K.", chambre: "—", statut: "Sortie", date: "25 avr. 2026" },
-  { initiales: "OD", bg: "#eef6fb", tc: "#0a5c8a", nom: "Omar Diouf", age: 41, medecin: "Dr. Diallo B.", chambre: "118-A", statut: "Hospitalisé", date: "26 avr. 2026" },
-  { initiales: "KF", bg: "#f3efff", tc: "#7c3aed", nom: "Khady Fall", age: 36, medecin: "Dr. Sow M.", chambre: "—", statut: "En attente", date: "30 avr. 2026" },
-];
-
-const rdvs = [
-  { patient: "Fatou Ndiaye", medecin: "Dr. Diallo B.", date: "30 Avr · 10h00", statut: "confirme" },
-  { patient: "Ibrahima Sarr", medecin: "Dr. Fall A.", date: "30 Avr · 11h30", statut: "urgent" },
-  { patient: "Rokhaya Diop", medecin: "Dr. Diallo B.", date: "01 Mai · 09h00", statut: "attente" },
-  { patient: "Aliou Ba", medecin: "Dr. Sow M.", date: "02 Mai · 14h00", statut: "confirme" },
-  { patient: "Omar Diouf", medecin: "Dr. Fall A.", date: "03 Mai · 10h30", statut: "confirme" },
-  { patient: "Khady Fall", medecin: "Dr. Diallo B.", date: "04 Mai · 14h00", statut: "attente" },
-  { patient: "Aminata Sy", medecin: "Dr. Sow M.", date: "05 Mai · 11h00", statut: "confirme" },
 ];
 
 // ─── UTILITAIRES ──────────────────────────────────────────────────────────────
@@ -133,26 +118,52 @@ function Badge({ statut }) {
 }
 
 // ─── SECTION : TABLEAU DE BORD ────────────────────────────────────────────────
-function SectionDashboard({ setActiveMenu }) {
+// ─── SECTION : TABLEAU DE BORD ────────────────────────────────────────────────
+function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhui }) {
+  const [stats, setStats] = useState(null);
+  const [medecins, setMedecinsList] = useState([]);
+  const [patientsList, setPatientsList] = useState([]);
+  const [rdvs, setRdvs] = useState([]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [st, md, pt, rv] = await Promise.all([
+          getStatsDashboard(),
+          getMedecins(),
+          getPatients(),
+          getRendezVous()
+        ]);
+        setStats(st);
+        setMedecinsList(md);
+        setPatientsList(pt);
+        setRdvs(rv);
+      } catch (e) {
+        console.error("Erreur chargement dashboard", e);
+      }
+    }
+    loadData();
+  }, []);
+
   return (
     <>
       <div className="topbar">
         <div>
           <div className="page-title">Tableau de bord — Administration</div>
-          <div className="page-sub">Lundi 4 mai 2026 · Hôpital KDG Health</div>
+          <div className="page-sub">{dateAujourdhui} · Hôpital KDG Health</div>
         </div>
         <div className="user-pill">
-          <div className="user-avatar">AD</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>Administrateur</span>
+          <div className="user-avatar">{initiales}</div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
         </div>
       </div>
 
       <div className="stats-grid">
         {[
-          { icon: "👨‍⚕️", bg: "#eef6fb", value: "12", label: "Médecins actifs", delta: "+2 ce mois", color: "#0f6e56" },
-          { icon: "👥", bg: "#e6f7f2", value: "348", label: "Patients enregistrés", delta: "+28 ce mois", color: "#0f6e56" },
-          { icon: "📅", bg: "#fef3e2", value: "47", label: "RDV cette semaine", delta: "8 aujourd'hui", color: "#7a90a0" },
-          { icon: "🚨", bg: "#fdeaea", value: "3", label: "Cas urgents", delta: "Attention requise", color: "#c0392b" },
+          { icon: "👨‍⚕️", bg: "#eef6fb", value: stats?.medecins || "0", label: "Médecins", delta: "Actifs", color: "#0f6e56" },
+          { icon: "👥", bg: "#e6f7f2", value: stats?.patients || "0", label: "Patients", delta: "Enregistrés", color: "#0f6e56" },
+          { icon: "📅", bg: "#fef3e2", value: stats?.rendezvous_aujourd_hui || "0", label: "RDV aujourd'hui", delta: "Aujourd'hui", color: "#7a90a0" },
+          { icon: "🏥", bg: "#fdeaea", value: stats?.hospitalisations_en_cours || "0", label: "Hospitalisations", delta: "En cours", color: "#c0392b" },
         ].map((s, i) => (
           <div key={i} className="stat-card">
             <div className="stat-icon" style={{ background: s.bg }}><span style={{ fontSize: 18 }}>{s.icon}</span></div>
@@ -163,41 +174,18 @@ function SectionDashboard({ setActiveMenu }) {
         ))}
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-title">Statistiques globales — Avril 2026</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-          {[
-            { label: "Taux d'occupation", value: 78, color: "#0a5c8a" },
-            { label: "Consultations réalisées", value: 92, color: "#0f6e56" },
-            { label: "Satisfaction patients", value: 88, color: "#7c3aed" },
-            { label: "RDV honorés", value: 95, color: "#ef9f27" },
-          ].map((s, i) => (
-            <div key={i}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#7a90a0" }}>{s.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${s.value}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <div className="grid-3">
         <div className="card">
-          <div className="card-title">Gestion des médecins <span className="card-link" onClick={() => setActiveMenu("medecins")}>+ Ajouter</span></div>
+          <div className="card-title">Gestion des médecins <span className="card-link" onClick={() => setActiveMenu("medecins")}>Voir tout →</span></div>
           <table>
-            <thead><tr><th>Médecin</th><th>Spécialité</th><th>Patients</th><th>Statut</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Médecin</th><th>Spécialité</th><th>Téléphone</th><th>Ordre</th></tr></thead>
             <tbody>
-              {medecins.map((m, i) => (
+              {medecins.slice(0, 4).map((m, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 600 }}>{m.nom}</td>
+                  <td style={{ fontWeight: 600 }}>Dr. {m.nom} {m.prenom}</td>
                   <td style={{ color: "#4a6070" }}>{m.specialite}</td>
-                  <td style={{ fontWeight: 600, color: "#0a5c8a" }}>{m.patients}</td>
-                  <td><Badge statut={m.statut} /></td>
-                  <td><div style={{ display: "flex", gap: 6 }}><button className="btn-action btn-edit">Modifier</button><button className="btn-action btn-delete">Retirer</button></div></td>
+                  <td style={{ fontWeight: 600, color: "#0a5c8a" }}>{m.telephone}</td>
+                  <td style={{ color: "#4a6070" }}>{m.numero_ordre}</td>
                 </tr>
               ))}
             </tbody>
@@ -205,13 +193,13 @@ function SectionDashboard({ setActiveMenu }) {
         </div>
 
         <div className="card">
-          <div className="card-title">Rendez-vous <span className="card-link" onClick={() => setActiveMenu("rdv")}>Voir tout →</span></div>
+          <div className="card-title">Rendez-vous récents <span className="card-link" onClick={() => setActiveMenu("rdv")}>Voir tout →</span></div>
           {rdvs.slice(0, 4).map((r, i) => (
             <div key={i} style={{ padding: "10px 0", borderBottom: i < 3 ? "1px solid #f0f4f8" : "none" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.patient}</div>
-                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.medecin} · {r.date}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>Patient #{r.patient_id}</div>
+                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_heure).toLocaleString('fr-FR')}</div>
                 </div>
                 <Badge statut={r.statut} />
               </div>
@@ -221,17 +209,16 @@ function SectionDashboard({ setActiveMenu }) {
       </div>
 
       <div className="card">
-        <div className="card-title">Gestion des patients <span className="card-link" onClick={() => setActiveMenu("patients")}>Voir tout →</span></div>
+        <div className="card-title">Patients récents <span className="card-link" onClick={() => setActiveMenu("patients")}>Voir tout →</span></div>
         <table>
-          <thead><tr><th>Patient</th><th>Âge</th><th>Médecin traitant</th><th>Statut</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Patient</th><th>Téléphone</th><th>Adresse</th><th>Contact d'urgence</th></tr></thead>
           <tbody>
-            {patients.slice(0, 4).map((p, i) => (
+            {patientsList.slice(0, 4).map((p, i) => (
               <tr key={i}>
-                <td style={{ fontWeight: 600 }}>{p.nom}</td>
-                <td style={{ color: "#4a6070" }}>{p.age} ans</td>
-                <td style={{ color: "#4a6070" }}>{p.medecin}</td>
-                <td><Badge statut={p.statut} /></td>
-                <td><div style={{ display: "flex", gap: 6 }}><button className="btn-action btn-edit">Voir</button><button className="btn-action btn-delete">Supprimer</button></div></td>
+                <td style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</td>
+                <td style={{ color: "#4a6070" }}>{p.telephone}</td>
+                <td style={{ color: "#4a6070" }}>{p.adresse}</td>
+                <td style={{ color: "#4a6070" }}>{p.contact_urgence || '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -241,142 +228,148 @@ function SectionDashboard({ setActiveMenu }) {
   );
 }
 
-// ─── SECTION : GESTION MÉDECINS ───────────────────────────────────────────────
+// ─── SECTION : GESTION MÉDECINS (connectée API) ───────────────────────────────
 function SectionMedecins() {
+  const [list, setList] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [compteInfo, setCompteInfo] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [form, setForm] = useState({ nom:"", prenom:"", specialite:"", telephone:"", email:"", numero_ordre:"", email_compte:"", password:"" });
+  const inp = { padding:"9px 12px", border:"1px solid #e8edf2", borderRadius:8, fontSize:13, fontFamily:"inherit", outline:"none", width:"100%" };
+
+  const load = async () => { try { const d = await getMedecins(); setList(Array.isArray(d)?d:d.data||[]); } catch(e){} };
+  useEffect(()=>{ load(); }, []);
+
+  const save = async () => {
+    try {
+      const res = await createMedecin(form);
+      if (res.compte_genere) setCompteInfo(res.compte_genere);
+      setShowForm(false); setMsg({type:"ok",text:"Médecin ajouté"}); load();
+    } catch(e) { setMsg({type:"err",text:e.message}); }
+  };
+  const remove = async (id) => { if(!window.confirm("Supprimer ce médecin ?")) return; try { await deleteMedecin(id); load(); } catch(e){} };
 
   return (
     <>
       <div className="pg-header">Gestion des médecins</div>
-      <div className="pg-sub-text">12 médecins · 3 spécialités · 1 inactif</div>
+      <div className="pg-sub-text">{list.length} médecins enregistrés</div>
+
+      {msg && <div style={{background:msg.type==="ok"?"#e6f7f2":"#fdeaea",color:msg.type==="ok"?"#0f6e56":"#c0392b",padding:"10px 16px",borderRadius:8,marginBottom:12,fontSize:13}}>{msg.text}</div>}
+      {compteInfo && (
+        <div style={{background:"#fff9e6",border:"1px solid #f0c040",borderRadius:10,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#854f0b",marginBottom:8}}>⚠️ Identifiants du compte médecin créé</div>
+          <div style={{fontSize:13}}>Email : <strong>{compteInfo.email}</strong> · Mot de passe : <strong style={{fontFamily:"monospace"}}>{compteInfo.password}</strong></div>
+          <button style={{background:"#854f0b",color:"#fff",border:"none",padding:"6px 14px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",marginTop:8}} onClick={()=>setCompteInfo(null)}>Noté ✓</button>
+        </div>
+      )}
 
       <div className="search-bar">
         <input type="text" placeholder="Rechercher un médecin..." />
-        <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}>
-          <option>Toutes les spécialités</option>
-          <option>Médecine générale</option><option>Cardiologie</option><option>Pédiatrie</option><option>Chirurgie</option>
-        </select>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>+ Ajouter un médecin</button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-title">Nouveau médecin</div>
+          <div className="card-title">Nouveau médecin — compte créé automatiquement</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-            {[["Nom complet", "text", "Dr. Prénom Nom"], ["Spécialité", "text", "Ex: Cardiologie"], ["Téléphone", "tel", "+221 77 XXX XX XX"]].map(([lbl, type, ph]) => (
-              <div key={lbl} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {[["Nom","nom"],["Prénom","prenom"],["Spécialité","specialite"],["Téléphone","telephone"],["Email pro","email"],["N° Ordre","numero_ordre"]].map(([lbl,key]) => (
+              <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#4a6070" }}>{lbl}</label>
-                <input type={type} placeholder={ph} style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", outline: "none" }} />
+                <input type="text" style={inp} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} />
               </div>
             ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "#0a5c8a" }}>Email compte connexion</label>
+              <input type="email" style={{...inp,borderColor:"#0a5c8a"}} value={form.email_compte} onChange={e=>setForm({...form,email_compte:e.target.value})} placeholder="Laissez vide = email pro" />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "#0a5c8a" }}>Mot de passe (optionnel)</label>
+              <input type="text" style={{...inp,borderColor:"#0a5c8a"}} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Auto-généré si vide" />
+            </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn-primary">Enregistrer</button>
+            <button className="btn-primary" onClick={save}>Enregistrer</button>
             <button className="btn-secondary" onClick={() => setShowForm(false)}>Annuler</button>
           </div>
         </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-        {medecins.map((m, i) => (
-          <div key={i} className="card">
+        {list.map((m, i) => (
+          <div key={m.id||i} className="card">
             <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: m.tc, flexShrink: 0 }}>{m.initiales}</div>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#eef6fb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#0a5c8a", flexShrink: 0 }}>{(m.nom||"?")[0]}{(m.prenom||"?")[0]}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>{m.nom}</div>
-                  <Badge statut={m.statut} />
-                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>Dr. {m.nom} {m.prenom}</div>
                 <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2 }}>{m.specialite}</div>
+                {m.user && <div style={{ fontSize: 11, color: "#0f6e56", marginTop: 4 }}>✓ Compte actif</div>}
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "14px 0" }}>
-              <div className="info-item" style={{ textAlign: "center", padding: "8px 10px" }}>
-                <div className="info-label">Patients</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#0a5c8a", fontFamily: "'Playfair Display', serif" }}>{m.patients}</div>
-              </div>
-              <div className="info-item" style={{ textAlign: "center", padding: "8px 10px" }}>
-                <div className="info-label">RDV auj.</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#0f6e56", fontFamily: "'Playfair Display', serif" }}>{m.rdv}</div>
-              </div>
-              <div className="info-item" style={{ textAlign: "center", padding: "8px 10px" }}>
-                <div className="info-label">Tél.</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#0d1f2d", marginTop: 2 }}>{m.tel}</div>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "14px 0" }}>
+              <div className="info-item"><div className="info-label">Téléphone</div><div className="info-value">{m.telephone||"—"}</div></div>
+              <div className="info-item"><div className="info-label">N° Ordre</div><div className="info-value">{m.numero_ordre||"—"}</div></div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-action btn-edit" style={{ flex: 1, padding: "7px" }}>Modifier</button>
-              <button className="btn-action btn-delete" style={{ flex: 1, padding: "7px" }}>Retirer</button>
+              <button className="btn-action btn-delete" style={{ flex: 1, padding: "7px" }} onClick={()=>remove(m.id)}>Retirer</button>
             </div>
           </div>
         ))}
+        {list.length===0 && <div style={{gridColumn:"1/-1",padding:40,textAlign:"center",color:"#7a90a0"}}>Aucun médecin enregistré</div>}
       </div>
     </>
   );
 }
 
 // ─── SECTION : GESTION PATIENTS ───────────────────────────────────────────────
+// ─── SECTION : GESTION PATIENTS ───────────────────────────────────────────────
 function SectionPatients() {
   const [filtre, setFiltre] = useState("tous");
+  const [patientsList, setPatientsList] = useState([]);
 
-  const filtres = filtre === "tous" ? patients : patients.filter(p =>
-    filtre === "urgent" ? p.statut === "Urgent" :
-    filtre === "hospi" ? p.statut === "Hospitalisé" :
-    p.statut === "En attente"
-  );
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await getPatients();
+        setPatientsList(Array.isArray(data) ? data : data.data || []);
+      } catch (e) { console.error("Erreur chargement patients", e); }
+    }
+    load();
+  }, []);
+
+  const filtres = patientsList;
 
   return (
     <>
       <div className="pg-header">Gestion des patients</div>
-      <div className="pg-sub-text">348 patients enregistrés · 5 hospitalisés actuellement</div>
+      <div className="pg-sub-text">{patientsList.length} patients enregistrés</div>
 
       <div className="search-bar">
         <input type="text" placeholder="Rechercher un patient..." />
-        <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}
-          value={filtre} onChange={e => setFiltre(e.target.value)}>
-          <option value="tous">Tous les statuts</option>
-          <option value="urgent">Urgents</option>
-          <option value="hospi">Hospitalisés</option>
-          <option value="attente">En attente</option>
-        </select>
         <button className="btn-primary">+ Nouveau patient</button>
       </div>
 
       <div className="card">
         <table>
-          <thead><tr><th>Patient</th><th>Âge</th><th>Médecin traitant</th><th>Chambre</th><th>Admission</th><th>Statut</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Patient</th><th>Téléphone</th><th>Adresse</th><th>Sexe</th><th>Groupe Sanguin</th><th>Contact Urgence</th></tr></thead>
           <tbody>
             {filtres.map((p, i) => (
               <tr key={i}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: p.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: p.tc, flexShrink: 0 }}>{p.initiales}</div>
-                    <span style={{ fontWeight: 600 }}>{p.nom}</span>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#eef6fb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#0a5c8a", flexShrink: 0 }}>{(p.nom||"?")[0]}{(p.prenom||"?")[0]}</div>
+                    <span style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</span>
                   </div>
                 </td>
-                <td style={{ color: "#4a6070" }}>{p.age} ans</td>
-                <td style={{ color: "#4a6070" }}>{p.medecin}</td>
-                <td style={{ color: "#4a6070" }}>{p.chambre}</td>
-                <td style={{ color: "#7a90a0" }}>{p.date}</td>
-                <td><Badge statut={p.statut} /></td>
-                <td>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn-action btn-edit">Voir</button>
-                    <button className="btn-action btn-delete">Supprimer</button>
-                  </div>
-                </td>
+                <td style={{ color: "#4a6070" }}>{p.telephone}</td>
+                <td style={{ color: "#4a6070" }}>{p.adresse}</td>
+                <td style={{ color: "#4a6070" }}>{p.sexe}</td>
+                <td style={{ color: "#7a90a0" }}>{p.groupe_sanguin}</td>
+                <td style={{ color: "#4a6070" }}>{p.contact_urgence}</td>
               </tr>
             ))}
+            {filtres.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", padding:20, color:"#7a90a0"}}>Aucun patient</td></tr>}
           </tbody>
         </table>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "0 4px" }}>
-        <span style={{ fontSize: 12, color: "#7a90a0" }}>Affichage 1–{filtres.length} sur 348 patients</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 12 }}>← Précédent</button>
-          <button className="btn-primary" style={{ padding: "6px 14px", fontSize: 12 }}>Suivant →</button>
-        </div>
       </div>
     </>
   );
@@ -384,16 +377,30 @@ function SectionPatients() {
 
 // ─── SECTION : RENDEZ-VOUS ────────────────────────────────────────────────────
 function SectionRdv() {
+  const [rdvs, setRdvs] = useState([]);
+  const [medecinsList, setMedecinsList] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [r, m] = await Promise.all([getRendezVous(), getMedecins()]);
+        setRdvs(Array.isArray(r) ? r : r.data || []);
+        setMedecinsList(Array.isArray(m) ? m : m.data || []);
+      } catch (e) { console.error("Erreur", e); }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <div className="pg-header">Rendez-vous</div>
-      <div className="pg-sub-text">Tous les rendez-vous programmés — Mai 2026</div>
+      <div className="pg-sub-text">Tous les rendez-vous programmés</div>
 
       <div className="search-bar">
         <input type="text" placeholder="Rechercher un RDV..." />
         <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}>
           <option>Tous les médecins</option>
-          {medecins.map(m => <option key={m.nom}>{m.nom}</option>)}
+          {medecinsList.map(m => <option key={m.id}>Dr. {m.nom} {m.prenom}</option>)}
         </select>
         <button className="btn-primary">+ Nouveau RDV</button>
       </div>
@@ -402,28 +409,29 @@ function SectionRdv() {
         <div className="card">
           <div className="card-title">Tous les rendez-vous</div>
           <table>
-            <thead><tr><th>Patient</th><th>Médecin</th><th>Date & Heure</th><th>Statut</th><th>Action</th></tr></thead>
+            <thead><tr><th>Patient ID</th><th>Médecin ID</th><th>Date & Heure</th><th>Statut</th><th>Motif</th></tr></thead>
             <tbody>
               {rdvs.map((r, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 600 }}>{r.patient}</td>
-                  <td style={{ color: "#4a6070" }}>{r.medecin}</td>
-                  <td style={{ color: "#7a90a0" }}>{r.date}</td>
+                  <td style={{ fontWeight: 600 }}>{r.patient_id}</td>
+                  <td style={{ color: "#4a6070" }}>{r.medecin_id}</td>
+                  <td style={{ color: "#7a90a0" }}>{new Date(r.date_heure).toLocaleString()}</td>
                   <td><Badge statut={r.statut} /></td>
-                  <td><span style={{ fontSize: 12, color: "#0a5c8a", fontWeight: 600, cursor: "pointer" }}>Modifier</span></td>
+                  <td style={{ color: "#4a6070" }}>{r.motif || '—'}</td>
                 </tr>
               ))}
+              {rdvs.length === 0 && <tr><td colSpan="5" style={{textAlign:"center", padding:20, color:"#7a90a0"}}>Aucun rendez-vous</td></tr>}
             </tbody>
           </table>
         </div>
 
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card-title">Résumé du jour</div>
+            <div className="card-title">Résumé des RDVs</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {[
-                ["Total RDV", "8", "#0a5c8a"], ["Confirmés", "5", "#0f6e56"],
-                ["En attente", "2", "#854f0b"], ["Urgents", "1", "#c0392b"],
+                ["Total RDV", rdvs.length, "#0a5c8a"], ["Confirmés", rdvs.filter(r => r.statut === "confirme").length, "#0f6e56"],
+                ["En attente", rdvs.filter(r => r.statut === "en_attente").length, "#854f0b"], ["Annulés", rdvs.filter(r => r.statut === "annule").length, "#c0392b"],
               ].map(([lbl, val, color]) => (
                 <div key={lbl} className="info-item" style={{ textAlign: "center" }}>
                   <div className="info-label">{lbl}</div>
@@ -431,21 +439,6 @@ function SectionRdv() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="card">
-            <div className="card-title">Charge par médecin</div>
-            {medecins.map((m, i) => (
-              <div key={i} style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: "#4a6070", fontWeight: 600 }}>{m.nom}</span>
-                  <span style={{ fontSize: 11, color: "#0a5c8a", fontWeight: 600 }}>{m.rdv} RDV</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${(m.rdv / 8) * 100}%`, background: m.statut === "inactif" ? "#f0f4f8" : "#0a5c8a" }} />
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -455,87 +448,33 @@ function SectionRdv() {
 
 // ─── SECTION : STATISTIQUES ───────────────────────────────────────────────────
 function SectionStats() {
-  const moisLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jui"];
-  const consultData = [28, 35, 42, 38, 45, 40];
-  const maxConsult = Math.max(...consultData);
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try { const d = await getStatsDashboard(); setStats(d); } catch(e) {}
+    }
+    load();
+  }, []);
 
   return (
     <>
       <div className="pg-header">Statistiques</div>
-      <div className="pg-sub-text">Indicateurs de performance — KDG Health 2026</div>
+      <div className="pg-sub-text">Indicateurs de performance de l'API Laravel</div>
 
       <div className="stats-grid">
         {[
-          { icon: "📊", bg: "#eef6fb", value: "78%", label: "Taux d'occupation", delta: "+5% vs mars", color: "#0f6e56" },
-          { icon: "✅", bg: "#e6f7f2", value: "95%", label: "RDV honorés", delta: "Objectif : 90%", color: "#0f6e56" },
-          { icon: "⭐", bg: "#fef3e2", value: "4.6/5", label: "Satisfaction patients", delta: "+0.2 vs trimestre", color: "#0f6e56" },
-          { icon: "⏱️", bg: "#f3efff", value: "18 min", label: "Temps d'attente moyen", delta: "-3 min vs mars", color: "#0f6e56" },
+          { icon: "👨‍⚕️", bg: "#eef6fb", value: stats?.medecins||"0", label: "Médecins", color: "#0a5c8a" },
+          { icon: "🩺", bg: "#e6f7f2", value: stats?.infirmiers||"0", label: "Infirmiers", color: "#0f6e56" },
+          { icon: "👥", bg: "#fef3e2", value: stats?.patients||"0", label: "Patients", color: "#854f0b" },
+          { icon: "🔬", bg: "#f3efff", value: stats?.consultations||"0", label: "Consultations", color: "#7c3aed" },
         ].map((s, i) => (
           <div key={i} className="stat-card">
             <div className="stat-icon" style={{ background: s.bg }}><span style={{ fontSize: 18 }}>{s.icon}</span></div>
             <div className="stat-value">{s.value}</div>
             <div className="stat-label">{s.label}</div>
-            <div className="stat-delta" style={{ color: s.color }}>{s.delta}</div>
           </div>
         ))}
-      </div>
-
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-title">Consultations — 6 derniers mois</div>
-          <div className="chart-bar">
-            {consultData.map((val, i) => (
-              <div key={i} className="bar-col">
-                <div className="bar-val">{val}</div>
-                <div className="bar-fill" style={{ height: `${(val / maxConsult) * 80}px`, background: i === 3 ? "#0a5c8a" : "#b5d4f4" }} />
-                <div className="bar-label">{moisLabels[i]}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 10, textAlign: "center" }}>Avril 2026 en surbrillance</div>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Répartition par spécialité</div>
-          {[
-            { label: "Médecine générale", pct: 42, color: "#0a5c8a", nb: 146 },
-            { label: "Pédiatrie", pct: 27, color: "#7c3aed", nb: 94 },
-            { label: "Cardiologie", pct: 19, color: "#0f6e56", nb: 66 },
-            { label: "Chirurgie", pct: 12, color: "#ef9f27", nb: 42 },
-          ].map((s, i) => (
-            <div key={i} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#4a6070", fontWeight: 600 }}>{s.label}</span>
-                <span style={{ fontSize: 11, color: "#7a90a0" }}>{s.nb} patients · <strong style={{ color: s.color }}>{s.pct}%</strong></span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${s.pct}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-title">Indicateurs qualité — Avril 2026</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-          {[
-            { label: "Taux d'occupation", value: 78, color: "#0a5c8a" },
-            { label: "Consultations réalisées", value: 92, color: "#0f6e56" },
-            { label: "Satisfaction patients", value: 88, color: "#7c3aed" },
-            { label: "RDV honorés", value: 95, color: "#ef9f27" },
-          ].map((s, i) => (
-            <div key={i}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#7a90a0" }}>{s.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${s.value}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </>
   );
@@ -620,16 +559,37 @@ function SectionRapports() {
 export default function DashboardAdmin() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [user, setUser] = useState(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const u = getUser();
+    if (!u) { navigate("/connexion"); return; }
+    setUser(u);
+
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  const prenom = user?.prenom || user?.name?.split(" ")[0] || "Admin";
+  const nom = user?.nom || user?.name?.split(" ")[1] || "";
+  const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "AD";
+  const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
 
   const renderSection = () => {
     switch (activeMenu) {
-      case "dashboard": return <SectionDashboard setActiveMenu={setActiveMenu} />;
-      case "medecins":  return <SectionMedecins />;
-      case "patients":  return <SectionPatients />;
-      case "rdv":       return <SectionRdv />;
-      case "stats":     return <SectionStats />;
-      case "rapports":  return <SectionRapports />;
-      default:          return null;
+      case "dashboard":       return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} />;
+      case "medecins":        return <SectionMedecins />;
+      case "infirmiers":      return <AdminInfirmiers />;
+      case "patients":        return <SectionPatients />;
+      case "consultations":   return <AdminConsultations />;
+      case "hospitalisations":return <AdminHospitalisations />;
+      case "rdv":             return <SectionRdv />;
+      case "facturation":     return <AdminFacturation />;
+      case "utilisateurs":    return <AdminUtilisateurs />;
+      case "stats":           return <SectionStats />;
+      case "rapports":        return <SectionRapports />;
+      default:                return null;
     }
   };
 
@@ -655,13 +615,13 @@ export default function DashboardAdmin() {
           </div>
           <div className="sidebar-footer">
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 4 }}>
-              <div className="user-avatar">AD</div>
+              <div className="user-avatar">{initiales}</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Administrateur</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Super Admin</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{prenom} {nom}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Administrateur</div>
               </div>
             </div>
-            <button className="logout-btn" onClick={() => navigate("/connexion")}>
+            <button className="logout-btn" onClick={() => { logout(); navigate("/connexion"); }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
               Déconnexion
             </button>

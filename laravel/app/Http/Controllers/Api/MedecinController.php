@@ -4,93 +4,116 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Medecin;
+use App\Models\User;
 use Illuminate\Http\Request;
-use OpenApi\Attributes as OA;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class MedecinController extends Controller
 {
-    #[OA\Get(
-        path: "/medecins",
-        operationId: "getMedecinsList",
-        tags: ["Medecins"],
-        summary: "Get list of medecins",
-        description: "Returns list of medecins"
-    )]
-    #[OA\Response(response: 200, description: "Successful operation")]
     public function index()
     {
-        return \App\Http\Resources\MedecinResource::collection(Medecin::all());
+        return response()->json(Medecin::with('user')->get());
     }
 
-    #[OA\Post(
-        path: "/medecins",
-        operationId: "storeMedecin",
-        tags: ["Medecins"],
-        summary: "Create a new medecin",
-        description: "Creates a new medecin record",
-    )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ["nom", "prenom", "specialite"],
-            properties: [
-                new OA\Property(property: "nom", type: "string", example: "Doe"),
-                new OA\Property(property: "prenom", type: "string", example: "Jane"),
-                new OA\Property(property: "specialite", type: "string", example: "Cardiologie"),
-                new OA\Property(property: "telephone", type: "string", example: "0600000000"),
-                new OA\Property(property: "email", type: "string", format: "email", example: "jane@hospital.com"),
-                new OA\Property(property: "numero_ordre", type: "string", example: "123456")
-            ]
-        )
-    )]
-    #[OA\Response(response: 201, description: "Medecin created")]
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nom' => 'required|string|max:255',
-            'prenom' => 'required|string|max:255',
-            'specialite' => 'required|string|max:255',
-            'telephone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:medecins,email|max:255',
+            'nom'          => 'required|string|max:255',
+            'prenom'       => 'required|string|max:255',
+            'specialite'   => 'required|string|max:255',
+            'telephone'    => 'nullable|string|max:255',
+            'email'        => 'nullable|email|unique:medecins,email|max:255',
             'numero_ordre' => 'nullable|string|unique:medecins,numero_ordre|max:255',
+            // Champs compte utilisateur (optionnels)
+            'email_compte' => 'nullable|email|unique:users,email|max:255',
+            'password'     => 'nullable|string|min:8',
         ]);
 
-        $medecin = Medecin::create($validated);
-        return new \App\Http\Resources\MedecinResource($medecin);
+        // Créer le compte User automatiquement
+        $emailCompte = $validated['email_compte'] ?? $validated['email'] ?? null;
+        $user = null;
+
+        if ($emailCompte) {
+            // Vérifier que l'email n'existe pas déjà dans users
+            if (!User::where('email', $emailCompte)->exists()) {
+                $roleId = \Illuminate\Support\Facades\DB::table('roles')->where('nom', 'medecin')->value('id');
+                
+                $password = $validated['password'] ?? Str::random(12);
+                $user = User::create([
+                    'nom'       => $validated['nom'],
+                    'prenom'    => $validated['prenom'],
+                    'email'     => $emailCompte,
+                    'password'  => Hash::make($password),
+                    'telephone' => $validated['telephone'] ?? null,
+                    'role'      => 'medecin',
+                    'role_id'   => $roleId ?? 2,
+                    'statut'    => 'actif',
+                ]);
+            }
+        }
+
+        $medecin = Medecin::create([
+            'user_id'      => $user?->id,
+            'nom'          => $validated['nom'],
+            'prenom'       => $validated['prenom'],
+            'specialite'   => $validated['specialite'],
+            'telephone'    => $validated['telephone'] ?? null,
+            'email'        => $validated['email'] ?? null,
+            'numero_ordre' => $validated['numero_ordre'] ?? null,
+        ]);
+
+        $response = $medecin->load('user')->toArray();
+
+        // Inclure le mot de passe généré dans la réponse (une seule fois)
+        if ($user && !isset($validated['password'])) {
+            $response['compte_genere'] = [
+                'email'    => $user->email,
+                'password' => $password ?? null,
+                'message'  => 'Compte créé automatiquement. Veuillez communiquer ces identifiants au médecin.',
+            ];
+        }
+
+        return response()->json($response, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Medecin $medecin)
     {
-        return new \App\Http\Resources\MedecinResource($medecin);
+        return response()->json($medecin->load('user'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Medecin $medecin)
     {
         $validated = $request->validate([
-            'nom' => 'sometimes|required|string|max:255',
-            'prenom' => 'sometimes|required|string|max:255',
-            'specialite' => 'sometimes|required|string|max:255',
-            'telephone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|unique:medecins,email,' . $medecin->id . '|max:255',
+            'nom'          => 'sometimes|required|string|max:255',
+            'prenom'       => 'sometimes|required|string|max:255',
+            'specialite'   => 'sometimes|required|string|max:255',
+            'telephone'    => 'nullable|string|max:255',
+            'email'        => 'nullable|email|unique:medecins,email,' . $medecin->id . '|max:255',
             'numero_ordre' => 'nullable|string|unique:medecins,numero_ordre,' . $medecin->id . '|max:255',
         ]);
 
         $medecin->update($validated);
-        return new \App\Http\Resources\MedecinResource($medecin);
+
+        // Synchroniser le nom/prénom du User lié si existant
+        if ($medecin->user_id && $medecin->user) {
+            $medecin->user->update([
+                'nom'    => $validated['nom'] ?? $medecin->user->nom,
+                'prenom' => $validated['prenom'] ?? $medecin->user->prenom,
+            ]);
+        }
+
+        return response()->json($medecin->load('user'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Medecin $medecin)
     {
+        // Désactiver le compte User lié sans le supprimer
+        if ($medecin->user_id && $medecin->user) {
+            $medecin->user->update(['statut' => 'inactif']);
+        }
+
         $medecin->delete();
-        return response()->json(['message' => 'Médecin supprimé avec succès'], 200);
+        return response()->json(['message' => 'Médecin supprimé avec succès']);
     }
 }
