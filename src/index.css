@@ -1,13 +1,447 @@
+/* ─── KDG Health Global Styles ─────────────────────────────────────────── */
+
+/* Variables de thème (clair par défaut, surchargées en dark mode) */
+:root {
+  --text-primary:   #0d1f2d;
+  --text-secondary: #4a6070;
+  --text-muted:     #7a90a0;
+  --bg-card:        #ffffff;
+  --bg-page:        #f4f7fa;
+  --border:         #e8edf2;
+}
+
+html[data-theme="dark"] {
+  --text-primary:   #ffffff;
+  --text-secondary: #b0bdc8;
+  --text-muted:     #8aa0b5;
+  --bg-card:        #1a2332;
+  --bg-page:        #0d1419;
+  --border:         #2d3a4a;
+}
+
+/* Classes utilitaires de texte adaptatif */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #f4f7fa;
+  color: #1a2332;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* ─── Scrollbar minimaliste ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #d0d8e0;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a0b0bc;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* ─── Sélection ───────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(10, 92, 138, 0.20);
+  color: #0d1f2d;
+}
+
+/* ─── Focus states cohérents pour inputs ──────────────────────────────── */
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: none; }
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px rgba(10, 92, 138, 0.10);
+  border-color: #0a5c8a !important;
+}
+
+/* ─── Animations globales ─────────────────────────────────────────────── */
+@keyframes sghFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sghSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes sghShimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.sgh-fade-in { animation: sghFadeIn 0.35s ease both; }
+.sgh-slide-in { animation: sghSlideIn 0.35s ease both; }
+
+/* Skeleton loader */
+.sgh-skeleton {
+  background: linear-gradient(90deg, #f0f4f8 0%, #fafbfc 50%, #f0f4f8 100%);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: sghShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* Hover lift effect */
+.sgh-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.sgh-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(10, 92, 138, 0.08);
+}
+
+/* Bouton avec feedback tactile */
+button {
+  transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { cursor: not-allowed !important; opacity: 0.5; }
+
+/* Liens et éléments cliquables */
+.card-link, .clickable { cursor: pointer; transition: opacity 0.15s, color 0.15s; }
+.card-link:hover { opacity: 0.75; }
+
+/* Section principale animée */
+.main-content > * { animation: sghFadeIn 0.3s ease both; }
+
+/* Empty state */
+.sgh-empty { padding: 50px 30px; text-align: center; color: #7a90a0; }
+.sgh-empty-icon { font-size: 42px; margin-bottom: 12px; opacity: 0.4; }
+.sgh-empty-title { font-size: 14px; font-weight: 600; color: #4a6070; margin-bottom: 6px; }
+.sgh-empty-sub { font-size: 12px; color: #a0b0bc; }
+
+/* Sidebar menu item amélioré */
+.menu-item { position: relative; }
+.menu-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: #fff;
+  border-radius: 0 3px 3px 0;
+}
+
+/* Card lift effect on hover */
+.card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
+.stat-card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
+.stat-card:hover {
+  box-shadow: 0 4px 18px rgba(10, 92, 138, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Print styles pour ordonnances */
+@media print {
+  .sidebar, .topbar, .search-bar { display: none !important; }
+  .main-content { margin-left: 0 !important; width: 100% !important; padding: 20px !important; }
+  body { background: #fff !important; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══ MODE SOMBRE ═════════════════════════════════════════════════════════ */
+/* Activé via data-theme="dark" sur <html>                                   */
+
+html[data-theme="dark"] body {
+  background: #0d1419 !important;
+  color: #d4dde6 !important;
+}
+
+/* Background principal des dashboards (style: background: #f4f7fa, etc.) */
+html[data-theme="dark"] body > #root > div > div > div:not(.sidebar):not([class*="anim"]) {
+  background: #0d1419;
+}
+
+/* Cards et conteneurs blancs → sombres */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] [class*="info-item"] {
+  background: #1a2332 !important;
+  border-color: #2d3a4a !important;
+  color: #d4dde6 !important;
+}
+
+/* Tables */
+html[data-theme="dark"] table thead tr,
+html[data-theme="dark"] table thead {
+  background: #0d1419 !important;
+}
+html[data-theme="dark"] table th {
+  color: #8aa0b5 !important;
+  border-bottom-color: #2d3a4a !important;
+}
+html[data-theme="dark"] table td {
+  color: #d4dde6 !important;
+  border-bottom-color: #2d3a4a !important;
+}
+
+/* Inputs / selects / textareas */
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background: #0d1419 !important;
+  border-color: #2d3a4a !important;
+  color: #d4dde6 !important;
+}
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(26, 140, 191, 0.25) !important;
+  border-color: #1a8cbf !important;
+}
+
+/* Titres et textes sombres → clairs */
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] .page-title,
+html[data-theme="dark"] .pg-header,
+html[data-theme="dark"] .card-title,
+html[data-theme="dark"] .stat-value,
+html[data-theme="dark"] .info-value,
+html[data-theme="dark"] .rdv-day,
+html[data-theme="dark"] .rdv-month {
+  color: #ffffff !important;
+}
+
+/* Textes secondaires */
+html[data-theme="dark"] .page-sub,
+html[data-theme="dark"] .pg-sub-text,
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .info-label {
+  color: #8aa0b5 !important;
+}
+
+/* User-pill : nom utilisateur (a un inline color #0d1f2d) */
+html[data-theme="dark"] .user-pill span {
+  color: #d4dde6 !important;
+}
+html[data-theme="dark"] .user-pill .user-avatar {
+  background: #0a5c8a !important;
+  color: #fff !important;
+}
+
+/* Stat-icon : garder leur fond pastel mais teinter en sombre */
+html[data-theme="dark"] .stat-icon {
+  filter: brightness(0.85);
+}
+
+/* Tous les textes avec inline color sombre dans les cards */
+html[data-theme="dark"] .card [style*="color: \"#0d1f2d\""],
+html[data-theme="dark"] .card [style*="color:'#0d1f2d'"],
+html[data-theme="dark"] .card [style*="color:#0d1f2d"] {
+  color: #d4dde6 !important;
+}
+
+/* RDV cards et autres cartes avec contenu */
+html[data-theme="dark"] .rdv-card,
+html[data-theme="dark"] .alert-card,
+html[data-theme="dark"] .result-item {
+  background: #1a2332 !important;
+  border-color: #2d3a4a !important;
+}
+
+/* Forcer la lisibilité des badges (qui ont parfois des fonds clairs) */
+html[data-theme="dark"] .badge,
+html[data-theme="dark"] [class*="badge-"] {
+  filter: brightness(1.1);
+}
+
+/* Topbar : assurer que les sous-titres et titres sont lisibles */
+html[data-theme="dark"] .topbar h1,
+html[data-theme="dark"] .topbar > div > div {
+  color: inherit;
+}
+
+/* Tab buttons */
+html[data-theme="dark"] .tab-btn {
+  color: #8aa0b5 !important;
+}
+html[data-theme="dark"] .tab-btn.active {
+  color: #fff !important;
+  background: #0a5c8a !important;
+}
+
+/* Chart cards & tooltips */
+.chart-title { color: #0d1f2d; }
+.chart-tooltip { background: #fff; border: 1px solid #e8edf2; }
+.chart-tooltip-label { color: #0d1f2d; }
+
+html[data-theme="dark"] .chart-title { color: #ffffff !important; }
+html[data-theme="dark"] .chart-tooltip {
+  background: #1a2332 !important;
+  border-color: #2d3a4a !important;
+  color: #d4dde6 !important;
+}
+html[data-theme="dark"] .chart-tooltip-label { color: #ffffff !important; }
+
+/* Recharts : grilles et axes */
+html[data-theme="dark"] .recharts-cartesian-grid line {
+  stroke: #2d3a4a !important;
+}
+html[data-theme="dark"] .recharts-cartesian-axis-line {
+  stroke: #3d4a5a !important;
+}
+html[data-theme="dark"] .recharts-cartesian-axis-tick-value {
+  fill: #8aa0b5 !important;
+}
+html[data-theme="dark"] .recharts-legend-item-text {
+  color: #d4dde6 !important;
+}
+
+/* Filtres de carte (background pastels qui restent visibles) */
+html[data-theme="dark"] [style*="background: \"#eef6fb\""],
+html[data-theme="dark"] [style*="background:#eef6fb"] {
+  background: #1f3a4d !important;
+}
+html[data-theme="dark"] [style*="background: \"#e6f7f2\""],
+html[data-theme="dark"] [style*="background:#e6f7f2"] {
+  background: #1c3530 !important;
+}
+html[data-theme="dark"] [style*="background: \"#fef3e2\""],
+html[data-theme="dark"] [style*="background:#fef3e2"] {
+  background: #3d2f15 !important;
+}
+html[data-theme="dark"] [style*="background: \"#fdeaea\""],
+html[data-theme="dark"] [style*="background:#fdeaea"] {
+  background: #3d1f1f !important;
+}
+html[data-theme="dark"] [style*="background: \"#f3efff\""],
+html[data-theme="dark"] [style*="background:#f3efff"] {
+  background: #2d2545 !important;
+}
+
+/* Cards stat-card avec background pastels colorés */
+html[data-theme="dark"] .stat-icon {
+  filter: brightness(0.7) contrast(1.2);
+}
+
+/* ─── Approche cascade : forcer la lisibilité dans les cards ────────────── */
+/* React sérialise color: "#0d1f2d" en rgb(13, 31, 45) dans certains navigateurs */
+/* On cible directement les nuances dark utilisées dans le projet */
+html[data-theme="dark"] .card [style*="#0d1f2d"],
+html[data-theme="dark"] .card [style*="#0d1f2c"],
+html[data-theme="dark"] .card [style*="rgb(13, 31, 45)"],
+html[data-theme="dark"] .card [style*="rgb(13,31,45)"],
+html[data-theme="dark"] .card [style*="#1a2332"],
+html[data-theme="dark"] .card [style*="rgb(26, 35, 50)"] {
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .card [style*="#4a6070"],
+html[data-theme="dark"] .card [style*="rgb(74, 96, 112)"] {
+  color: #b0bdc8 !important;
+}
+
+/* RDV cards : pastilles de date doivent garder leur couleur sur fond pastel sombre */
+html[data-theme="dark"] .rdv-card,
+html[data-theme="dark"] .rdv-date-block {
+  background: #1c3530 !important;
+}
+html[data-theme="dark"] .rdv-day,
+html[data-theme="dark"] .rdv-month {
+  color: #4ade80 !important;
+}
+
+/* Info-items du dossier médical en dark */
+html[data-theme="dark"] .info-item {
+  background: #0d1419 !important;
+  border: 1px solid #2d3a4a !important;
+}
+html[data-theme="dark"] .info-value {
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .info-label {
+  color: #8aa0b5 !important;
+}
+
+/* Stats grid cartes : forcer le texte clair */
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .stat-card * {
+  color: inherit;
+}
+html[data-theme="dark"] .stat-card {
+  color: #d4dde6 !important;
+}
+html[data-theme="dark"] .stat-card .stat-value {
+  color: #ffffff !important;
+}
+
+/* Cartes avec liste de paires label/valeur (dossier médical à droite) */
+html[data-theme="dark"] .card > div > div > span:last-child,
+html[data-theme="dark"] .card div[style*="justify-content: space-between"] span:last-child {
+  color: #ffffff !important;
+}
+
+/* Boutons de fonctionnalités sur fond pastel : garder leur lisibilité */
+html[data-theme="dark"] [style*="background: \"#eef6fb\""] [style*="#0a5c8a"],
+html[data-theme="dark"] [style*="background:#eef6fb"] [style*="#0a5c8a"] {
+  color: #6db4dc !important;
+}
+
+/* Topbar nom utilisateur (user-pill) */
+html[data-theme="dark"] .user-pill,
+html[data-theme="dark"] .user-pill * {
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .user-pill .user-avatar {
+  background: #0a5c8a !important;
+  color: #ffffff !important;
+}
+
+/* Topbar / barre supérieure */
+html[data-theme="dark"] .topbar {
+  background: transparent !important;
+}
+html[data-theme="dark"] .user-pill {
+  background: #1a2332 !important;
+  border-color: #2d3a4a !important;
+  color: #d4dde6 !important;
+}
+
+/* Bordures et lignes de séparation */
+html[data-theme="dark"] [style*="border-bottom: 1px solid #f0f4f8"],
+html[data-theme="dark"] [style*="borderBottom: \"1px solid #f0f4f8\""] {
+  border-bottom-color: #2d3a4a !important;
+}
+
+/* Scrollbar en mode sombre */
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3d4a5a;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #5d6a7a;
+}
+
+/* Sélection */
+html[data-theme="dark"] ::selection {
+  background: rgba(26, 140, 191, 0.30);
+  color: #fff;
+}
+
+/* Skeleton en sombre */
+html[data-theme="dark"] .sgh-skeleton {
+  background: linear-gradient(90deg, #1a2332 0%, #2d3a4a 50%, #1a2332 100%);
+}
+
+/* Transitions douces lors du switch */
+html, body, .card, .stat-card, .topbar, table, input, select, textarea, .user-pill {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }

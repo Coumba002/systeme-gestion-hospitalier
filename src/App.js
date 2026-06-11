@@ -6,19 +6,22 @@ import ConnexionPage from "./ConnexionPage";
 import DashboardMedecin from "./DashboardMedecin";
 import DashboardPatient from "./DashboardPatient.jsx";
 import DashboardAdmin from "./DashboardAdmin";
+import { ToastProvider } from "./components/Toast";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/inscription" element={<InscriptionPage />} />
-        <Route path="/connexion" element={<ConnexionPage />} />
-        <Route path="/dashboard/medecin" element={<DashboardMedecin />} />
-        <Route path="/dashboard/patient" element={<DashboardPatient />} />
-        <Route path="/dashboard/admin" element={<DashboardAdmin />} />
-      </Routes>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/inscription" element={<InscriptionPage />} />
+          <Route path="/connexion" element={<ConnexionPage />} />
+          <Route path="/dashboard/medecin" element={<DashboardMedecin />} />
+          <Route path="/dashboard/patient" element={<DashboardPatient />} />
+          <Route path="/dashboard/admin" element={<DashboardAdmin />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 

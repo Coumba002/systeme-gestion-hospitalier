@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUser, logout } from "./api";
-import { getStatsPatient, getRendezVous, getPrescriptions, getResultats, getMessages } from "./api";
+import { getStatsPatient, getRendezVous, getPrescriptions, getResultats, getMessages, getPatients, getMedecins } from "./api";
+import { printOrdonnance } from "./utils/printPdf";
+import PatientRendezVous from "./sections/PatientRendezVous";
+import Messagerie from "./sections/Messagerie";
+import Logo from "./components/Logo";
+import { useUnreadMessages } from "./hooks/useUnreadMessages";
+import { ThemeToggle } from "./hooks/useTheme";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7fa; }
 
-  .sidebar { width: 240px; background: linear-gradient(180deg, #0f6e56 0%, #1a9e75 100%); min-height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; }
+  .sidebar { width: 240px; background: linear-gradient(180deg, #0f6e56 0%, #1a9e75 100%); height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; overflow-y: auto; overflow-x: hidden; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
   .sidebar-logo { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; gap: 10px; }
   .sidebar-logo span { font-family: 'Playfair Display', serif; font-size: 18px; color: #fff; font-weight: 700; }
   .sidebar-menu { padding: 16px 12px; flex: 1; }
@@ -105,24 +115,29 @@ function Badge({ statut, label }) {
   return <span className={`badge ${map[statut] || "badge-bleu"}`}>{label || lblMap[statut] || statut}</span>;
 }
 
-function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhui }) {
+function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhui, patientId }) {
   const [stats, setStats] = React.useState(null);
   const [rdvs, setRdvs] = React.useState([]);
   const [ordonnances, setOrdonnances] = React.useState([]);
   const [resultats, setResultats] = React.useState([]);
+  const [patient, setPatient] = React.useState(null);
 
   React.useEffect(() => {
     async function load() {
       try {
-        const [s, r, o, rs] = await Promise.all([getStatsPatient(), getRendezVous(), getPrescriptions(), getResultats()]);
+        const [s, r, o, rs, pl] = await Promise.all([
+          getStatsPatient(), getRendezVous(), getPrescriptions(), getResultats(), getPatients(),
+        ]);
         setStats(s);
         setRdvs(Array.isArray(r) ? r : r.data || []);
         setOrdonnances(Array.isArray(o) ? o : o.data || []);
         setResultats(Array.isArray(rs) ? rs : rs.data || []);
+        const arr = Array.isArray(pl) ? pl : pl.data || [];
+        setPatient(arr.find(p => p.id === patientId) || arr[0]);
       } catch (e) { console.error(e); }
     }
     load();
-  }, []);
+  }, [patientId]);
 
   return (
     <>
@@ -131,9 +146,12 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           <div className="page-title">Bonjour, {prenom} 👋</div>
           <div className="page-sub">{dateAujourdhui} · Voici votre espace santé</div>
         </div>
-        <div className="user-pill">
-          <div className="user-avatar">{initiales}</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ThemeToggle />
+          <div className="user-pill">
+            <div className="user-avatar">{initiales}</div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{prenom} {nom}</span>
+          </div>
         </div>
       </div>
 
@@ -164,8 +182,8 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
                   <div className="rdv-month">{date.toLocaleString('fr-FR', {month: 'short'})}</div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Dr. #{r.medecin_id}</div>
-                  <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.motif} · {date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
+                  <div className="text-primary" style={{ fontSize: 13, fontWeight: 700 }}>Dr. #{r.medecin_id}</div>
+                  <div className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>{r.motif} · {date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</div>
                 </div>
                 <Badge statut={r.statut} />
               </div>
@@ -176,12 +194,16 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
         <div className="card">
           <div className="card-title">Mon dossier médical <span className="card-link" onClick={() => setActiveMenu("dossier")}>Détail →</span></div>
           {[
-            ["Groupe sanguin", "A+"], ["Allergies", "Pénicilline"], ["Antécédents", "Diabète type 2"],
-            ["Médecin traitant", "Dr. Diallo B."], ["Dernière visite", "15 avril 2026"], ["Poids / Taille", "68 kg · 1m65"],
+            ["Groupe sanguin", patient?.groupe_sanguin || "—"],
+            ["Allergies", patient?.allergies || "Aucune"],
+            ["Antécédents", patient?.antecedents || "Aucun"],
+            ["Mutuelle", patient?.mutuelle || "—"],
+            ["Téléphone", patient?.telephone || "—"],
+            ["Contact urgence", patient?.contact_urgence || "—"],
           ].map(([lbl, val], i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < 5 ? "1px solid #f0f4f8" : "none" }}>
-              <span style={{ fontSize: 12, color: "#7a90a0" }}>{lbl}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{val}</span>
+            <div key={i} className="kv-row" style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < 5 ? "1px solid #f0f4f8" : "none", gap: 8 }}>
+              <span className="text-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{lbl}</span>
+              <span className="text-primary" style={{ fontSize: 13, fontWeight: 600, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</span>
             </div>
           ))}
         </div>
@@ -193,7 +215,7 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           {resultats.slice(0, 4).map((r, i) => (
             <div key={i} className="result-item">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.type_examen}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{r.type_examen}</div>
                 <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_examen).toLocaleDateString()}</div>
               </div>
             </div>
@@ -204,7 +226,7 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           <div className="card-title">Mes ordonnances <span className="card-link" onClick={() => setActiveMenu("ordonnances")}>Voir →</span></div>
           {ordonnances.slice(0, 3).map((o, i) => (
             <div key={i} style={{ padding: "10px 0", borderBottom: i < 2 ? "1px solid #f0f4f8" : "none" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>{o.medicaments}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>{o.medicaments}</div>
               <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>Dr. #{o.medecin_id}</div>
               <div style={{ fontSize: 10, color: "#0f6e56", marginTop: 4, fontWeight: 600 }}>Le {new Date(o.created_at).toLocaleDateString()}</div>
             </div>
@@ -247,8 +269,8 @@ function SectionRdv() {
                 <div className="rdv-month">{date.toLocaleString('fr-FR', {month: 'short'})}</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>Dr. #{r.medecin_id}</div>
-                <div style={{ fontSize: 12, color: "#4a6070", marginTop: 3 }}>{r.motif}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>Dr. #{r.medecin_id}</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary, #4a6070)", marginTop: 3 }}>{r.motif}</div>
                 <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
                   <span style={{ fontSize: 11, color: "#7a90a0" }}>🕐 {date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</span>
                 </div>
@@ -275,7 +297,7 @@ function SectionRdv() {
               <tr key={i}>
                 <td style={{ color: "#7a90a0" }}>{date}</td>
                 <td style={{ fontWeight: 600 }}>{med}</td>
-                <td style={{ color: "#4a6070" }}>{type}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{type}</td>
                 <td><span className="card-link">{doc} →</span></td>
               </tr>
             ))}
@@ -286,40 +308,83 @@ function SectionRdv() {
   );
 }
 
-function SectionDossier({ prenom, nom, initiales }) {
+function SectionDossier({ prenom, nom, initiales, patientId }) {
   const [activeTab, setActiveTab] = useState("infos");
+  const [patient, setPatient] = useState(null);
+  const [resultats, setResultats] = useState([]);
+  const [consultations, setConsultations] = useState([]);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [list, rs] = await Promise.all([getPatients(), getResultats()]);
+        const arr = Array.isArray(list) ? list : list.data || [];
+        const me = arr.find(p => p.id === patientId) || arr[0];
+        setPatient(me);
+        setResultats(Array.isArray(rs) ? rs : rs.data || []);
+      } catch (e) { console.error(e); }
+    }
+    load();
+  }, [patientId]);
+
   const tabs = [
     { key: "infos", label: "Informations" },
-    { key: "antecedents", label: "Antécédents" },
-    { key: "constantes", label: "Constantes vitales" },
-    { key: "vaccins", label: "Vaccinations" },
+    { key: "antecedents", label: "Antécédents & allergies" },
+    { key: "examens", label: `Résultats d'examens (${resultats.length})` },
   ];
+
+  const calcAge = (dn) => {
+    if (!dn) return null;
+    const d = new Date(dn);
+    const diff = Date.now() - d.getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  };
+  const age = calcAge(patient?.date_naissance);
+
+  const allergiesList = (patient?.allergies || "").split(/[,·;\n]/).map(s => s.trim()).filter(Boolean);
+  const antecedentsList = (patient?.antecedents || "").split(/[·;\n]/).map(s => s.trim()).filter(Boolean);
+
   return (
     <>
       <div className="pg-header">Mon dossier médical</div>
       <div className="pg-sub-text">Toutes vos informations de santé en un seul endroit</div>
       <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
-        <div style={{ width: 180, background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#e6f7f2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#0f6e56" }}>{initiales}</div>
+        <div style={{ width: 200, background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0, alignSelf: "flex-start" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#e6f7f2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "#0f6e56" }}>{initiales}</div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>{prenom} {nom}</div>
-            <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>N° SGH-2024-0041</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>{prenom} {nom}</div>
+            <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>ID Patient #{patient?.id || "—"}</div>
+            {age != null && <div style={{ fontSize: 12, color: "#0f6e56", marginTop: 4, fontWeight: 600 }}>{age} ans</div>}
           </div>
           <div style={{ background: "#e6f7f2", borderRadius: 8, padding: "8px 16px", textAlign: "center", width: "100%" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#0f6e56", fontFamily: "'Playfair Display', serif" }}>A+</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#0f6e56", fontFamily: "'Playfair Display', serif" }}>
+              {patient?.groupe_sanguin || "—"}
+            </div>
             <div style={{ fontSize: 10, color: "#0f6e56", fontWeight: 600 }}>Groupe sanguin</div>
           </div>
+          {patient?.mutuelle && (
+            <div style={{ background: "#eef6fb", borderRadius: 8, padding: "8px 12px", textAlign: "center", width: "100%" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0a5c8a" }}>{patient.mutuelle}</div>
+              <div style={{ fontSize: 10, color: "#0a5c8a" }}>Mutuelle</div>
+            </div>
+          )}
         </div>
+
         <div style={{ flex: 1 }}>
           <div className="card">
             <div>{tabs.map(t => <button key={t.key} className={`tab-btn${activeTab === t.key ? " active" : ""}`} onClick={() => setActiveTab(t.key)}>{t.label}</button>)}</div>
+
             {activeTab === "infos" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
-                  ["Nom complet", `${prenom} ${nom}`], ["Date de naissance", "—"],
-                  ["Adresse", "—"], ["Téléphone", "—"],
-                  ["Médecin traitant", "Dr. Diallo B."], ["Mutuelle", "IPRES Santé"],
-                  ["Poids", "68 kg"], ["Taille", "1m65"],
+                  ["Nom complet", `${patient?.nom || nom} ${patient?.prenom || prenom}`],
+                  ["Date de naissance", patient?.date_naissance ? new Date(patient.date_naissance).toLocaleDateString("fr-FR") : "—"],
+                  ["Sexe", patient?.sexe || "—"],
+                  ["Téléphone", patient?.telephone || "—"],
+                  ["Email", patient?.email || "—"],
+                  ["Adresse", patient?.adresse || "—"],
+                  ["N° Sécurité sociale", patient?.numero_securite_sociale || "—"],
+                  ["Contact d'urgence", patient?.contact_urgence || "—"],
                 ].map(([lbl, val]) => (
                   <div key={lbl} className="info-item">
                     <div className="info-label">{lbl}</div>
@@ -328,46 +393,58 @@ function SectionDossier({ prenom, nom, initiales }) {
                 ))}
               </div>
             )}
+
             {activeTab === "antecedents" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div className="info-item"><div className="info-label">Maladies chroniques</div><div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.6 }}>Diabète de type 2 (depuis 2018) · Hypertension légère (depuis 2021)</div></div>
-                <div className="info-item"><div className="info-label">Allergies médicamenteuses</div><div style={{ marginTop: 6 }}><span className="badge badge-rouge">Pénicilline</span><span className="badge badge-orange" style={{ marginLeft: 6 }}>AINS</span></div></div>
-                <div className="info-item"><div className="info-label">Chirurgies</div><div style={{ fontSize: 13, marginTop: 4 }}>Appendicectomie (2012)</div></div>
-                <div className="info-item"><div className="info-label">Antécédents familiaux</div><div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.6 }}>Diabète (mère, sœur) · Cardiopathie ischémique (père)</div></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div className="info-item">
+                  <div className="info-label">Allergies médicamenteuses</div>
+                  {allergiesList.length ? (
+                    <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {allergiesList.map((a, i) => (
+                        <span key={i} className="badge badge-rouge">⚠ {a}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, marginTop: 6, color: "#7a90a0", fontStyle: "italic" }}>Aucune allergie enregistrée</div>
+                  )}
+                </div>
+                <div className="info-item">
+                  <div className="info-label">Antécédents médicaux</div>
+                  {antecedentsList.length ? (
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {antecedentsList.map((a, i) => (
+                        <div key={i} style={{ fontSize: 13, color: "var(--text-primary, #0d1f2d)", paddingLeft: 12, borderLeft: "2px solid #0f6e56" }}>{a}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, marginTop: 6, color: "#7a90a0", fontStyle: "italic" }}>Aucun antécédent enregistré</div>
+                  )}
+                </div>
               </div>
             )}
-            {activeTab === "constantes" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                {[
-                  ["Tension artérielle", "138/88 mmHg", "orange", "Surveillé"],
-                  ["Glycémie à jeun", "5.6 mmol/L", "vert", "Normal"],
-                  ["IMC", "25.0 kg/m²", "vert", "Normal"],
-                  ["Fréquence cardiaque", "72 bpm", "vert", "Normal"],
-                  ["Température", "36.8 °C", "vert", "Normal"],
-                  ["Saturation O²", "98%", "vert", "Normal"],
-                ].map(([lbl, val, statut, lb], i) => (
-                  <div key={i} className="info-item" style={{ textAlign: "center" }}>
-                    <div className="info-label">{lbl}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0d1f2d", margin: "6px 0", fontFamily: "'Playfair Display', serif" }}>{val}</div>
-                    <Badge statut={statut} label={lb} />
-                  </div>
-                ))}
-              </div>
-            )}
-            {activeTab === "vaccins" && (
-              <table>
-                <thead><tr><th>Vaccin</th><th>Date</th><th>Prochain rappel</th><th>Statut</th></tr></thead>
-                <tbody>
-                  {[
-                    ["Covid-19", "Sept. 2023", "Sept. 2025", "vert", "À jour"],
-                    ["Grippe saisonnière", "Oct. 2025", "Oct. 2026", "vert", "À jour"],
-                    ["Tétanos", "Mars 2018", "Mars 2028", "vert", "À jour"],
-                    ["Hépatite B", "Janv. 2010", "—", "vert", "Complet"],
-                  ].map(([vac, date, rappel, statut, lb], i) => (
-                    <tr key={i}><td style={{ fontWeight: 600 }}>{vac}</td><td style={{ color: "#7a90a0" }}>{date}</td><td style={{ color: "#4a6070" }}>{rappel}</td><td><Badge statut={statut} label={lb} /></td></tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {activeTab === "examens" && (
+              resultats.length === 0 ? (
+                <div style={{ padding: 30, textAlign: "center", color: "#7a90a0" }}>Aucun résultat d'examen disponible pour le moment.</div>
+              ) : (
+                <table>
+                  <thead><tr><th>Date</th><th>Examen</th><th>Valeur</th><th>Interprétation</th></tr></thead>
+                  <tbody>
+                    {resultats.map(r => {
+                      const interMap = { normal: ["vert", "Normal"], a_surveiller: ["orange", "À surveiller"], anormal: ["rouge", "Anormal"] };
+                      const [statut, lb] = interMap[r.interpretation] || ["bleu", r.interpretation || "—"];
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ color: "#7a90a0" }}>{r.date_examen ? new Date(r.date_examen).toLocaleDateString("fr-FR") : "—"}</td>
+                          <td style={{ fontWeight: 600 }}>{r.nom_examen || r.type_examen}</td>
+                          <td>{r.valeur} {r.unite}</td>
+                          <td><Badge statut={statut} label={lb} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
             )}
           </div>
         </div>
@@ -376,36 +453,62 @@ function SectionDossier({ prenom, nom, initiales }) {
   );
 }
 
-function SectionOrdonnances() {
+function SectionOrdonnances({ patientId }) {
   const [ordonnances, setOrdonnances] = React.useState([]);
+  const [medecins, setMedecinsList] = React.useState([]);
+  const [patient, setPatient] = React.useState(null);
 
   React.useEffect(() => {
     async function load() {
       try {
-        const o = await getPrescriptions();
+        const [o, md, pl] = await Promise.all([getPrescriptions(), getMedecins(), getPatients()]);
         setOrdonnances(Array.isArray(o) ? o : o.data || []);
+        setMedecinsList(Array.isArray(md) ? md : md.data || []);
+        const arr = Array.isArray(pl) ? pl : pl.data || [];
+        setPatient(arr.find(p => p.id === patientId) || arr[0]);
       } catch (e) { console.error(e); }
     }
     load();
-  }, []);
+  }, [patientId]);
 
   return (
     <>
       <div className="pg-header">Mes ordonnances</div>
-      <div className="pg-sub-text">Toutes mes ordonnances</div>
+      <div className="pg-sub-text">Toutes mes ordonnances — téléchargez en PDF pour la pharmacie</div>
       <div className="grid-2">
         <div>
-          {ordonnances.map((o, i) => (
-            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 18, marginBottom: 14, borderLeft: `4px solid #0f6e56` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>{o.medicaments}</div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 11, color: "#7a90a0" }}>Prescrit par Dr. #{o.medecin_id} · Le {new Date(o.created_at).toLocaleDateString()}</div>
-                <button className="btn-primary" style={{ fontSize: 11, padding: "5px 12px" }}>Télécharger</button>
-              </div>
+          {ordonnances.length === 0 && (
+            <div style={{ padding: 40, textAlign: "center", color: "#7a90a0", background: "#fff", border: "1px solid #e8edf2", borderRadius: 12 }}>
+              Aucune ordonnance pour le moment
             </div>
-          ))}
+          )}
+          {ordonnances.map((o, i) => {
+            const med = medecins.find(m => m.id === o.medecin_id);
+            return (
+              <div key={i} style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 12, padding: 18, marginBottom: 14, borderLeft: `4px solid #0f6e56` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>{o.medicaments}</div>
+                </div>
+                {(o.dosage || o.frequence || o.duree) && (
+                  <div style={{ fontSize: 12, color: "var(--text-secondary, #4a6070)", marginBottom: 8 }}>
+                    {[o.dosage, o.frequence, o.duree].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 11, color: "#7a90a0" }}>
+                    Prescrit par Dr. {med ? `${med.nom} ${med.prenom}` : `#${o.medecin_id}`} · Le {new Date(o.created_at).toLocaleDateString("fr-FR")}
+                  </div>
+                  <button
+                    onClick={() => printOrdonnance({ prescription: o, patient, medecin: med })}
+                    className="btn-primary"
+                    style={{ fontSize: 11, padding: "5px 12px" }}
+                  >
+                    🖨 PDF
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
@@ -421,7 +524,7 @@ function SectionOrdonnances() {
               { nom: "Pharmacie Fann", addr: "Route de Fann", tel: "+221 33 825 03 22" },
             ].map((p, i) => (
               <div key={i} style={{ padding: "10px 0", borderBottom: i < 2 ? "1px solid #f0f4f8" : "none" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{p.nom}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{p.nom}</div>
                 <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{p.addr}</div>
                 <div style={{ fontSize: 11, color: "#0f6e56", marginTop: 2, fontWeight: 600 }}>{p.tel}</div>
               </div>
@@ -458,7 +561,7 @@ function SectionResultats() {
             <div key={i}>
               <div className="result-item" onClick={() => setSelected(selected === i ? null : i)}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.type_examen}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{r.type_examen}</div>
                   <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_examen).toLocaleDateString()}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
@@ -467,7 +570,7 @@ function SectionResultats() {
               </div>
               {selected === i && (
                 <div style={{ margin: "0 0 8px", background: "#f9fbfc", borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontSize: 13, color: "#0d1f2d" }}>{r.interpretation}</div>
+                  <div style={{ fontSize: 13, color: "var(--text-primary, #0d1f2d)" }}>{r.interpretation}</div>
                 </div>
               )}
             </div>
@@ -484,7 +587,7 @@ function SectionResultats() {
             ].map((s, i) => (
               <div key={i} style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: "#4a6070", fontWeight: 600 }}>{s.label}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary, #4a6070)", fontWeight: 600 }}>{s.label}</span>
                   <span style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.note}</span>
                 </div>
                 <div style={{ height: 6, background: "#f0f4f8", borderRadius: 3, overflow: "hidden" }}>
@@ -547,6 +650,7 @@ export default function DashboardPatient() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [user, setUser] = useState(null);
+  const unreadCount = useUnreadMessages(user?.id);
 
   const [now, setNow] = useState(new Date());
 
@@ -566,14 +670,28 @@ export default function DashboardPatient() {
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase();
   const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
 
+  const [patientId, setPatientId] = useState(null);
+  useEffect(() => {
+    async function findPatient() {
+      try {
+        const list = await getPatients();
+        const arr = Array.isArray(list) ? list : list.data || [];
+        const u = getUser();
+        const mine = arr.find(p => p.user_id === u?.id);
+        if (mine) setPatientId(mine.id);
+      } catch (e) {}
+    }
+    findPatient();
+  }, []);
+
   const renderSection = () => {
     switch (activeMenu) {
-      case "dashboard":   return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} />;
-      case "rdv":         return <SectionRdv />;
-      case "dossier":     return <SectionDossier prenom={prenom} nom={nom} initiales={initiales} />;
-      case "ordonnances": return <SectionOrdonnances />;
+      case "dashboard":   return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} patientId={patientId} />;
+      case "rdv":         return <PatientRendezVous patientId={patientId} />;
+      case "dossier":     return <SectionDossier prenom={prenom} nom={nom} initiales={initiales} patientId={patientId} />;
+      case "ordonnances": return <SectionOrdonnances patientId={patientId} />;
       case "resultats":   return <SectionResultats />;
-      case "messagerie":  return <SectionMessagerie />;
+      case "messagerie":  return <Messagerie accentColor="#0f6e56" />;
       default:            return null;
     }
   };
@@ -584,19 +702,28 @@ export default function DashboardPatient() {
       <div style={{ display: "flex", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div style={{ width: 32, height: 32, background: "rgba(255,255,255,0.2)", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 3a1 1 0 011 1v3h3a1 1 0 010 2h-3v3a1 1 0 01-2 0v-3H8a1 1 0 010-2h3V7a1 1 0 011-1z" /></svg>
-            </div>
-            <span>KDG Health</span>
+            <Logo size={36} withText textColor="#fff" subtitleColor="rgba(255,255,255,0.7)" gap={10} />
           </div>
           <div className="sidebar-menu">
             <div className="menu-label">Menu patient</div>
             {menuItems.map(item => (
               <button key={item.key} className={`menu-item${activeMenu === item.key ? " active" : ""}`} onClick={() => setActiveMenu(item.key)}>
                 <span style={{ fontSize: 16 }}>{item.icon}</span>
-                {item.label}
-                {item.key === "messagerie" && (
-                  <span style={{ background: "#c0392b", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 8, marginLeft: "auto" }}>1</span>
+                <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+                {item.key === "messagerie" && unreadCount > 0 && (
+                  <span style={{
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    minWidth: 18,
+                    textAlign: "center",
+                    boxShadow: "0 0 0 2px rgba(239,68,68,0.2)",
+                  }}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
                 )}
               </button>
             ))}

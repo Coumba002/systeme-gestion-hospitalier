@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { getFactures, createFacture, enregistrerPaiement, getPatients } from "../api";
+import { getFactures, createFacture, enregistrerPaiement, getPatients, getConsultations, getHospitalisations } from "../api";
+import { printFacture } from "../utils/printPdf";
 
 const S_FACT = { en_attente:["#fef3e2","#854f0b","En attente"], payee:["#e6f7f2","#0f6e56","Payée"], partielle:["#eef6fb","#0a5c8a","Partielle"], annulee:["#fdeaea","#c0392b","Annulée"] };
 const MODES = ["especes","carte","assurance","mobile","virement"];
+
+// Tarifs standards (F CFA) — adapter selon la grille tarifaire de l'établissement
+const TARIFS = {
+  consultation_generale: 15000,
+  consultation_specialiste: 25000,
+  hospitalisation_jour: 35000,
+  hospitalisation_chir: 50000,
+  hospitalisation_mat: 40000,
+};
 
 function Badge({s}) {
   const [bg,col,lbl]=S_FACT[s]||["#f0f4f8","#7a90a0",s];
@@ -12,22 +22,92 @@ function Badge({s}) {
 export default function AdminFacturation() {
   const [factures, setFactures] = useState([]);
   const [patients, setPatients] = useState([]);
+  const [consultations, setConsultations] = useState([]);
+  const [hospitalisations, setHospitalisations] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [showAuto, setShowAuto] = useState(false);
   const [paiementModal, setPaiementModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState(null);
   const [form, setForm] = useState({ patient_id:"", montant_total:"", description:"", date_emission:new Date().toISOString().slice(0,10), date_echeance:"" });
   const [pForm, setPForm] = useState({ montant:"", mode:"especes", date_paiement:new Date().toISOString().slice(0,16), reference:"" });
 
+  // ─── Génération auto depuis prestations ──────────────────────────────────
+  const [autoPatient, setAutoPatient] = useState("");
+  const [selectedItems, setSelectedItems] = useState({}); // { "c-3": true, "h-5": true }
+
   const load = async () => {
     try {
-      const [f,p] = await Promise.all([getFactures(), getPatients()]);
+      const [f, p, c, h] = await Promise.all([
+        getFactures(), getPatients(),
+        getConsultations(), getHospitalisations(),
+      ]);
       setFactures(Array.isArray(f)?f:f.data||[]);
       setPatients(Array.isArray(p)?p:p.data||[]);
+      setConsultations(Array.isArray(c)?c:c.data||[]);
+      setHospitalisations(Array.isArray(h)?h:h.data||[]);
     } catch(e) { setMsg({type:"err",text:e.message}); }
     setLoading(false);
   };
   useEffect(()=>{load();},[]);
+
+  // Prestations du patient sélectionné non encore facturées
+  const prestationsPatient = () => {
+    if (!autoPatient) return { consultations: [], hospitalisations: [] };
+    const pid = parseInt(autoPatient);
+    return {
+      consultations: consultations.filter(c => c.patient_id === pid && c.statut === "realisee"),
+      hospitalisations: hospitalisations.filter(h => h.patient_id === pid && h.statut === "sortie"),
+    };
+  };
+
+  const tarifConsultation = (c) => TARIFS.consultation_generale;
+  const tarifHospitalisation = (h) => {
+    const jours = h.date_entree && h.date_sortie_reelle
+      ? Math.max(1, Math.ceil((new Date(h.date_sortie_reelle) - new Date(h.date_entree)) / (1000 * 60 * 60 * 24)))
+      : 1;
+    return jours * TARIFS.hospitalisation_jour;
+  };
+
+  const totalAuto = () => {
+    const { consultations: cs, hospitalisations: hs } = prestationsPatient();
+    let total = 0;
+    cs.forEach(c => { if (selectedItems[`c-${c.id}`]) total += tarifConsultation(c); });
+    hs.forEach(h => { if (selectedItems[`h-${h.id}`]) total += tarifHospitalisation(h); });
+    return total;
+  };
+
+  const genererFacture = async () => {
+    const total = totalAuto();
+    if (total === 0) { setMsg({ type: "err", text: "Sélectionnez au moins une prestation" }); return; }
+    const { consultations: cs, hospitalisations: hs } = prestationsPatient();
+    const lignes = [];
+    cs.forEach(c => {
+      if (selectedItems[`c-${c.id}`]) {
+        lignes.push(`Consultation du ${new Date(c.date_consultation).toLocaleDateString("fr-FR")} (${tarifConsultation(c).toLocaleString("fr-FR")} F)`);
+      }
+    });
+    hs.forEach(h => {
+      if (selectedItems[`h-${h.id}`]) {
+        const jours = h.date_entree && h.date_sortie_reelle
+          ? Math.max(1, Math.ceil((new Date(h.date_sortie_reelle) - new Date(h.date_entree)) / (1000 * 60 * 60 * 24)))
+          : 1;
+        lignes.push(`Hospitalisation ${jours} jour(s) Ch.${h.chambre} (${tarifHospitalisation(h).toLocaleString("fr-FR")} F)`);
+      }
+    });
+    try {
+      await createFacture({
+        patient_id: parseInt(autoPatient),
+        montant_total: total,
+        description: lignes.join(" · "),
+        date_emission: new Date().toISOString().slice(0, 10),
+        date_echeance: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      });
+      setShowAuto(false); setSelectedItems({}); setAutoPatient("");
+      setMsg({ type: "ok", text: `Facture générée : ${total.toLocaleString("fr-FR")} F CFA` });
+      load();
+    } catch (e) { setMsg({ type: "err", text: e.message }); }
+  };
 
   const save = async () => {
     try { await createFacture(form); setShowForm(false); setMsg({type:"ok",text:"Facture créée"}); load(); }
@@ -92,9 +172,93 @@ export default function AdminFacturation() {
         </div>
       )}
 
-      <div style={{display:"flex",gap:10,marginBottom:16}}>
-        <button style={btn("#1a2332","#fff")} onClick={()=>setShowForm(!showForm)}>+ Nouvelle facture</button>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <button style={btn("#0a5c8a","#fff")} onClick={()=>{ setShowAuto(true); setShowForm(false); }}>
+          ⚡ Générer depuis prestations
+        </button>
+        <button style={btn("#1a2332","#fff")} onClick={()=>{ setShowForm(!showForm); setShowAuto(false); }}>+ Nouvelle facture manuelle</button>
       </div>
+
+      {/* Modal génération auto */}
+      {showAuto && (() => {
+        const { consultations: cs, hospitalisations: hs } = prestationsPatient();
+        const total = totalAuto();
+        return (
+          <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8edf2",padding:20,marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#0d1f2d"}}>⚡ Générer une facture depuis les prestations</div>
+              <button onClick={()=>{setShowAuto(false);setAutoPatient("");setSelectedItems({});}} style={{background:"transparent",border:"none",fontSize:18,color:"#7a90a0",cursor:"pointer"}}>×</button>
+            </div>
+
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:600,color:"#4a6070",display:"block",marginBottom:4}}>Patient</label>
+              <select style={inp} value={autoPatient} onChange={e=>{setAutoPatient(e.target.value);setSelectedItems({});}}>
+                <option value="">-- Choisir un patient --</option>
+                {patients.map(p=><option key={p.id} value={p.id}>{p.nom} {p.prenom}</option>)}
+              </select>
+            </div>
+
+            {autoPatient && cs.length === 0 && hs.length === 0 && (
+              <div style={{padding:20,textAlign:"center",color:"#7a90a0",fontSize:13,background:"#fafbfc",borderRadius:8}}>
+                Aucune prestation facturable (consultations réalisées ou hospitalisations terminées) pour ce patient.
+              </div>
+            )}
+
+            {autoPatient && cs.length > 0 && (
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#0a5c8a",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>
+                  🩺 Consultations ({cs.length})
+                </div>
+                {cs.map(c=>(
+                  <label key={`c-${c.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:selectedItems[`c-${c.id}`]?"#eef6fb":"#fafbfc",borderRadius:6,marginBottom:5,cursor:"pointer",border:"1px solid "+(selectedItems[`c-${c.id}`]?"#0a5c8a":"#f0f4f8")}}>
+                    <input type="checkbox" checked={!!selectedItems[`c-${c.id}`]} onChange={e=>setSelectedItems({...selectedItems,[`c-${c.id}`]:e.target.checked})}/>
+                    <div style={{flex:1,fontSize:12}}>
+                      <div style={{fontWeight:600,color:"#0d1f2d"}}>{c.date_consultation?new Date(c.date_consultation).toLocaleDateString("fr-FR"):"—"} · {c.motif||"Sans motif"}</div>
+                      {c.diagnostic && <div style={{color:"#7a90a0",fontSize:11,marginTop:2}}>{c.diagnostic.slice(0,80)}{c.diagnostic.length>80?"…":""}</div>}
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#0a5c8a"}}>{tarifConsultation(c).toLocaleString("fr-FR")} F</div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {autoPatient && hs.length > 0 && (
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#7c3aed",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>
+                  🏥 Hospitalisations ({hs.length})
+                </div>
+                {hs.map(h=>{
+                  const jours = h.date_entree && h.date_sortie_reelle
+                    ? Math.max(1, Math.ceil((new Date(h.date_sortie_reelle) - new Date(h.date_entree)) / (1000 * 60 * 60 * 24)))
+                    : 1;
+                  return (
+                    <label key={`h-${h.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:selectedItems[`h-${h.id}`]?"#f3efff":"#fafbfc",borderRadius:6,marginBottom:5,cursor:"pointer",border:"1px solid "+(selectedItems[`h-${h.id}`]?"#7c3aed":"#f0f4f8")}}>
+                      <input type="checkbox" checked={!!selectedItems[`h-${h.id}`]} onChange={e=>setSelectedItems({...selectedItems,[`h-${h.id}`]:e.target.checked})}/>
+                      <div style={{flex:1,fontSize:12}}>
+                        <div style={{fontWeight:600,color:"#0d1f2d"}}>Chambre {h.chambre} {h.lit?`· ${h.lit}`:""} · {jours} jour(s)</div>
+                        <div style={{color:"#7a90a0",fontSize:11,marginTop:2}}>{h.motif||"Sans motif"} · {h.date_entree?new Date(h.date_entree).toLocaleDateString("fr-FR"):""} → {h.date_sortie_reelle?new Date(h.date_sortie_reelle).toLocaleDateString("fr-FR"):""}</div>
+                      </div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#7c3aed"}}>{tarifHospitalisation(h).toLocaleString("fr-FR")} F</div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {autoPatient && total > 0 && (
+              <div style={{borderTop:"2px solid #f0f4f8",paddingTop:14,marginTop:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,color:"#7a90a0",textTransform:"uppercase"}}>Total facture</div>
+                  <div style={{fontSize:24,fontWeight:700,color:"#0d1f2d",fontFamily:"'Playfair Display',serif"}}>{total.toLocaleString("fr-FR")} F CFA</div>
+                </div>
+                <button style={btn("#0f6e56","#fff")} onClick={genererFacture}>
+                  Créer la facture
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {showForm && (
         <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8edf2",padding:20,marginBottom:20}}>
@@ -141,10 +305,17 @@ export default function AdminFacturation() {
                   <td style={{padding:"10px 14px",color:"#0f6e56",fontWeight:600}}>{parseFloat(f.montant_paye||0).toLocaleString("fr-FR")} F</td>
                   <td style={{padding:"10px 14px"}}><Badge s={f.statut}/></td>
                   <td style={{padding:"10px 14px",color:"#7a90a0"}}>{f.date_emission?new Date(f.date_emission).toLocaleDateString("fr-FR"):"—"}</td>
-                  <td style={{padding:"10px 14px"}}>
+                  <td style={{padding:"10px 14px",display:"flex",gap:5}}>
                     {f.statut!=="payee" && f.statut!=="annulee" && (
                       <button onClick={()=>{setPaiementModal(f);setPForm({montant:"",mode:"especes",date_paiement:new Date().toISOString().slice(0,16),reference:""});}} style={{background:"#e6f7f2",color:"#0f6e56",border:"none",padding:"5px 10px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer"}}>Payer</button>
                     )}
+                    <button
+                      onClick={() => printFacture({ facture: f, patient: f.patient })}
+                      title="Imprimer / Exporter en PDF"
+                      style={{background:"#eef6fb",color:"#0a5c8a",border:"none",padding:"5px 10px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer"}}
+                    >
+                      🖨 PDF
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -5,6 +5,14 @@ import AdminHospitalisations from "./sections/AdminHospitalisations";
 import AdminFacturation from "./sections/AdminFacturation";
 import AdminInfirmiers from "./sections/AdminInfirmiers";
 import AdminUtilisateurs from "./sections/AdminUtilisateurs";
+import AdminRendezVous from "./sections/AdminRendezVous";
+import AdminPatients from "./sections/AdminPatients";
+import Messagerie from "./sections/Messagerie";
+import Logo from "./components/Logo";
+import { useUnreadMessages } from "./hooks/useUnreadMessages";
+import { ThemeToggle } from "./hooks/useTheme";
+import AdminCharts from "./sections/AdminCharts";
+import AdminAuditLog from "./sections/AdminAuditLog";
 import { getMedecins, createMedecin, deleteMedecin, getPatients, deletePatient, getStatsDashboard, getRendezVous, getUser, logout } from "./api";
 
 // ─── STYLES GLOBAUX ───────────────────────────────────────────────────────────
@@ -13,7 +21,11 @@ const globalStyles = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7fa; }
 
-  .sidebar { width: 240px; background: linear-gradient(180deg, #1a2332 0%, #2d3a4a 100%); min-height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; }
+  .sidebar { width: 240px; background: linear-gradient(180deg, #1a2332 0%, #2d3a4a 100%); height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; overflow-y: auto; overflow-x: hidden; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
   .sidebar-logo { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
   .sidebar-logo span { font-family: 'Playfair Display', serif; font-size: 18px; color: #fff; font-weight: 700; }
   .sidebar-menu { padding: 16px 12px; flex: 1; }
@@ -99,8 +111,10 @@ const menuItems = [
   { icon: "🏥", label: "Hospitalisations", key: "hospitalisations" },
   { icon: "📅", label: "Rendez-vous", key: "rdv" },
   { icon: "💰", label: "Facturation", key: "facturation" },
+  { icon: "💬", label: "Messagerie", key: "messagerie" },
   { icon: "👤", label: "Utilisateurs", key: "utilisateurs" },
   { icon: "📈", label: "Statistiques", key: "stats" },
+  { icon: "🔍", label: "Audit log", key: "audit" },
   { icon: "📄", label: "Rapports", key: "rapports" },
 ];
 
@@ -150,11 +164,14 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
       <div className="topbar">
         <div>
           <div className="page-title">Tableau de bord — Administration</div>
-          <div className="page-sub">{dateAujourdhui} · Hôpital KDG Health</div>
+          <div className="page-sub">{dateAujourdhui} · KDG Health</div>
         </div>
-        <div className="user-pill">
-          <div className="user-avatar">{initiales}</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ThemeToggle />
+          <div className="user-pill">
+            <div className="user-avatar">{initiales}</div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{prenom} {nom}</span>
+          </div>
         </div>
       </div>
 
@@ -174,6 +191,11 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
         ))}
       </div>
 
+      {/* Graphiques analytiques */}
+      <div style={{ marginBottom: 18 }}>
+        <AdminCharts />
+      </div>
+
       <div className="grid-3">
         <div className="card">
           <div className="card-title">Gestion des médecins <span className="card-link" onClick={() => setActiveMenu("medecins")}>Voir tout →</span></div>
@@ -183,9 +205,9 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
               {medecins.slice(0, 4).map((m, i) => (
                 <tr key={i}>
                   <td style={{ fontWeight: 600 }}>Dr. {m.nom} {m.prenom}</td>
-                  <td style={{ color: "#4a6070" }}>{m.specialite}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{m.specialite}</td>
                   <td style={{ fontWeight: 600, color: "#0a5c8a" }}>{m.telephone}</td>
-                  <td style={{ color: "#4a6070" }}>{m.numero_ordre}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{m.numero_ordre}</td>
                 </tr>
               ))}
             </tbody>
@@ -198,7 +220,7 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
             <div key={i} style={{ padding: "10px 0", borderBottom: i < 3 ? "1px solid #f0f4f8" : "none" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>Patient #{r.patient_id}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>Patient #{r.patient_id}</div>
                   <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{new Date(r.date_heure).toLocaleString('fr-FR')}</div>
                 </div>
                 <Badge statut={r.statut} />
@@ -216,9 +238,9 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
             {patientsList.slice(0, 4).map((p, i) => (
               <tr key={i}>
                 <td style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</td>
-                <td style={{ color: "#4a6070" }}>{p.telephone}</td>
-                <td style={{ color: "#4a6070" }}>{p.adresse}</td>
-                <td style={{ color: "#4a6070" }}>{p.contact_urgence || '—'}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.telephone}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.adresse}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.contact_urgence || '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -274,7 +296,7 @@ function SectionMedecins() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
             {[["Nom","nom"],["Prénom","prenom"],["Spécialité","specialite"],["Téléphone","telephone"],["Email pro","email"],["N° Ordre","numero_ordre"]].map(([lbl,key]) => (
               <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "#4a6070" }}>{lbl}</label>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>{lbl}</label>
                 <input type="text" style={inp} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} />
               </div>
             ))}
@@ -300,7 +322,7 @@ function SectionMedecins() {
             <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
               <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#eef6fb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#0a5c8a", flexShrink: 0 }}>{(m.nom||"?")[0]}{(m.prenom||"?")[0]}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1f2d" }}>Dr. {m.nom} {m.prenom}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>Dr. {m.nom} {m.prenom}</div>
                 <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2 }}>{m.specialite}</div>
                 {m.user && <div style={{ fontSize: 11, color: "#0f6e56", marginTop: 4 }}>✓ Compte actif</div>}
               </div>
@@ -360,11 +382,11 @@ function SectionPatients() {
                     <span style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</span>
                   </div>
                 </td>
-                <td style={{ color: "#4a6070" }}>{p.telephone}</td>
-                <td style={{ color: "#4a6070" }}>{p.adresse}</td>
-                <td style={{ color: "#4a6070" }}>{p.sexe}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.telephone}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.adresse}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.sexe}</td>
                 <td style={{ color: "#7a90a0" }}>{p.groupe_sanguin}</td>
-                <td style={{ color: "#4a6070" }}>{p.contact_urgence}</td>
+                <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.contact_urgence}</td>
               </tr>
             ))}
             {filtres.length === 0 && <tr><td colSpan="6" style={{textAlign:"center", padding:20, color:"#7a90a0"}}>Aucun patient</td></tr>}
@@ -398,7 +420,7 @@ function SectionRdv() {
 
       <div className="search-bar">
         <input type="text" placeholder="Rechercher un RDV..." />
-        <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}>
+        <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
           <option>Tous les médecins</option>
           {medecinsList.map(m => <option key={m.id}>Dr. {m.nom} {m.prenom}</option>)}
         </select>
@@ -414,10 +436,10 @@ function SectionRdv() {
               {rdvs.map((r, i) => (
                 <tr key={i}>
                   <td style={{ fontWeight: 600 }}>{r.patient_id}</td>
-                  <td style={{ color: "#4a6070" }}>{r.medecin_id}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{r.medecin_id}</td>
                   <td style={{ color: "#7a90a0" }}>{new Date(r.date_heure).toLocaleString()}</td>
                   <td><Badge statut={r.statut} /></td>
-                  <td style={{ color: "#4a6070" }}>{r.motif || '—'}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{r.motif || '—'}</td>
                 </tr>
               ))}
               {rdvs.length === 0 && <tr><td colSpan="5" style={{textAlign:"center", padding:20, color:"#7a90a0"}}>Aucun rendez-vous</td></tr>}
@@ -459,8 +481,8 @@ function SectionStats() {
 
   return (
     <>
-      <div className="pg-header">Statistiques</div>
-      <div className="pg-sub-text">Indicateurs de performance de l'API Laravel</div>
+      <div className="pg-header">Statistiques & Analytics</div>
+      <div className="pg-sub-text">Vue d'ensemble de l'activité hospitalière</div>
 
       <div className="stats-grid">
         {[
@@ -475,6 +497,10 @@ function SectionStats() {
             <div className="stat-label">{s.label}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <AdminCharts />
       </div>
     </>
   );
@@ -498,8 +524,8 @@ function SectionRapports() {
                 { label: "Format", type: "select", options: ["PDF", "Excel", "CSV"] },
               ].map(({ label, type, options }) => (
                 <div key={label} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "#4a6070" }}>{label}</label>
-                  <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#0d1f2d", outline: "none" }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>{label}</label>
+                  <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
                     {options.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
@@ -518,7 +544,7 @@ function SectionRapports() {
               <div key={i} style={{ padding: "10px 0", borderBottom: i < 2 ? "1px solid #f0f4f8" : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{r.nom}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{r.nom}</div>
                     <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.freq} · Prochain : {r.proch}</div>
                   </div>
                   <Badge statut={r.statut} />
@@ -543,7 +569,7 @@ function SectionRapports() {
                 <span style={{ fontSize: 10, fontWeight: 700, color: r.color }}>{r.type}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nom}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nom}</div>
                 <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.date} · {r.taille}</div>
               </div>
               <button className="btn-action btn-edit">↓ Télécharger</button>
@@ -574,6 +600,7 @@ export default function DashboardAdmin() {
   const prenom = user?.prenom || user?.name?.split(" ")[0] || "Admin";
   const nom = user?.nom || user?.name?.split(" ")[1] || "";
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "AD";
+  const unreadCount = useUnreadMessages(user?.id);
   const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
 
   const renderSection = () => {
@@ -581,13 +608,15 @@ export default function DashboardAdmin() {
       case "dashboard":       return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} />;
       case "medecins":        return <SectionMedecins />;
       case "infirmiers":      return <AdminInfirmiers />;
-      case "patients":        return <SectionPatients />;
+      case "patients":        return <AdminPatients />;
       case "consultations":   return <AdminConsultations />;
       case "hospitalisations":return <AdminHospitalisations />;
-      case "rdv":             return <SectionRdv />;
+      case "rdv":             return <AdminRendezVous />;
       case "facturation":     return <AdminFacturation />;
+      case "messagerie":      return <Messagerie accentColor="#1a2332" />;
       case "utilisateurs":    return <AdminUtilisateurs />;
       case "stats":           return <SectionStats />;
+      case "audit":           return <AdminAuditLog />;
       case "rapports":        return <SectionRapports />;
       default:                return null;
     }
@@ -599,17 +628,29 @@ export default function DashboardAdmin() {
       <div style={{ display: "flex", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div style={{ width: 32, height: 32, background: "rgba(255,255,255,0.15)", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 3a1 1 0 011 1v3h3a1 1 0 010 2h-3v3a1 1 0 01-2 0v-3H8a1 1 0 010-2h3V7a1 1 0 011-1z" /></svg>
-            </div>
-            <span>KDG Health</span>
+            <Logo size={36} withText textColor="#fff" subtitleColor="rgba(255,255,255,0.6)" gap={10} />
           </div>
           <div className="sidebar-menu">
             <div className="menu-label">Administration</div>
             {menuItems.map(item => (
               <button key={item.key} className={`menu-item${activeMenu === item.key ? " active" : ""}`} onClick={() => setActiveMenu(item.key)}>
                 <span style={{ fontSize: 16 }}>{item.icon}</span>
-                {item.label}
+                <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+                {item.key === "messagerie" && unreadCount > 0 && (
+                  <span style={{
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    minWidth: 18,
+                    textAlign: "center",
+                    boxShadow: "0 0 0 2px rgba(239,68,68,0.2)",
+                  }}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>

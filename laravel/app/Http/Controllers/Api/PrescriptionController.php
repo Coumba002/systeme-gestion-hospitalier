@@ -4,102 +4,82 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Prescription;
+use App\Models\Patient;
+use App\Models\Medecin;
 use Illuminate\Http\Request;
-use OpenApi\Attributes as OA;
 
 class PrescriptionController extends Controller
 {
-    #[OA\Get(
-        path: "/prescriptions",
-        operationId: "getPrescriptionsList",
-        tags: ["Prescriptions"],
-        summary: "Get list of prescriptions",
-        description: "Returns list of prescriptions"
-    )]
-    #[OA\Response(response: 200, description: "Successful operation")]
-    public function index()
+    public function index(Request $request)
     {
-        return \App\Http\Resources\PrescriptionResource::collection(Prescription::all());
+        $query = Prescription::with(['patient', 'medecin']);
+        $user = $request->user();
+
+        if ($user && $user->role === 'medecin') {
+            $medecin = Medecin::where('user_id', $user->id)->first();
+            if ($medecin) $query->where('medecin_id', $medecin->id);
+        } elseif ($user && $user->role === 'patient') {
+            $patient = Patient::where('user_id', $user->id)->first();
+            if ($patient) $query->where('patient_id', $patient->id);
+        }
+
+        return response()->json($query->orderByDesc('id')->get());
     }
 
-    #[OA\Post(
-        path: "/prescriptions",
-        operationId: "storePrescription",
-        tags: ["Prescriptions"],
-        summary: "Create a new prescription",
-        description: "Creates a new prescription record",
-    )]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ["patient_id", "medecin_id", "date_prescription", "medications", "dosage", "frequency", "duration"],
-            properties: [
-                new OA\Property(property: "patient_id", type: "integer", example: 1),
-                new OA\Property(property: "medecin_id", type: "integer", example: 1),
-                new OA\Property(property: "date_prescription", type: "string", format: "date", example: "2026-05-01"),
-                new OA\Property(property: "medications", type: "string", example: "Paracetamol"),
-                new OA\Property(property: "dosage", type: "string", example: "1000mg"),
-                new OA\Property(property: "frequency", type: "string", example: "3 times a day"),
-                new OA\Property(property: "duration", type: "string", example: "5 days"),
-                new OA\Property(property: "notes", type: "string", example: "Take after meals"),
-                new OA\Property(property: "status", type: "string", example: "active")
-            ]
-        )
-    )]
-    #[OA\Response(response: 201, description: "Prescription created")]
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'patient_id' => 'required|exists:patients,id',
-            'medecin_id' => 'required|exists:medecins,id',
-            'date_prescription' => 'required|date',
-            'medications' => 'required|string',
-            'dosage' => 'required|string',
-            'frequency' => 'required|string',
-            'duration' => 'required|string',
-            'instructions' => 'nullable|string',
-            'status' => 'required|string',
+            'patient_id'        => 'required|exists:patients,id',
+            'medecin_id'        => 'nullable|exists:medecins,id',
+            'consultation_id'   => 'nullable|exists:consultations,id',
+            'date_prescription' => 'nullable|date',
+            'medicaments'       => 'required|string',
+            'dosage'            => 'nullable|string|max:100',
+            'frequence'         => 'nullable|string|max:100',
+            'duree'             => 'nullable|string|max:100',
+            'instructions'      => 'nullable|string',
+            'statut'            => 'nullable|in:active,terminee,annulee',
         ]);
 
+        if (empty($validated['medecin_id']) && $request->user()) {
+            $medecin = Medecin::where('user_id', $request->user()->id)->first();
+            if ($medecin) $validated['medecin_id'] = $medecin->id;
+        }
+        if (empty($validated['date_prescription'])) {
+            $validated['date_prescription'] = now()->toDateString();
+        }
+
         $prescription = Prescription::create($validated);
-        return new \App\Http\Resources\PrescriptionResource($prescription);
+        return response()->json($prescription->load(['patient', 'medecin']), 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Prescription $prescription)
     {
-        return new \App\Http\Resources\PrescriptionResource($prescription);
+        return response()->json($prescription->load(['patient', 'medecin', 'consultation']));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Prescription $prescription)
     {
         $validated = $request->validate([
-            'patient_id' => 'sometimes|required|exists:patients,id',
-            'medecin_id' => 'sometimes|required|exists:medecins,id',
-            'date_prescription' => 'sometimes|required|date',
-            'medications' => 'sometimes|required|string',
-            'dosage' => 'sometimes|required|string',
-            'frequency' => 'sometimes|required|string',
-            'duration' => 'sometimes|required|string',
-            'instructions' => 'nullable|string',
-            'status' => 'sometimes|required|string',
+            'patient_id'        => 'sometimes|exists:patients,id',
+            'medecin_id'        => 'sometimes|exists:medecins,id',
+            'consultation_id'   => 'nullable|exists:consultations,id',
+            'date_prescription' => 'nullable|date',
+            'medicaments'       => 'sometimes|string',
+            'dosage'            => 'nullable|string|max:100',
+            'frequence'         => 'nullable|string|max:100',
+            'duree'             => 'nullable|string|max:100',
+            'instructions'      => 'nullable|string',
+            'statut'            => 'sometimes|in:active,terminee,annulee',
         ]);
 
         $prescription->update($validated);
-        return new \App\Http\Resources\PrescriptionResource($prescription);
+        return response()->json($prescription->load(['patient', 'medecin']));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Prescription $prescription)
     {
         $prescription->delete();
-        return response()->json(['message' => 'Prescription deleted successfully'], 200);
+        return response()->json(['message' => 'Prescription supprimée'], 200);
     }
 }

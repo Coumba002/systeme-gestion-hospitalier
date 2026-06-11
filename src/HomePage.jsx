@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import Logo from "./components/Logo";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -142,15 +143,42 @@ const features = [
   },
 ];
 
-const stats = [
+const defaultStats = [
   { value: "Ready", label: "Système prêt à l'utilisation" },
   { value: "98 %", label: "Satisfaction" },
   { value: "100%", label: "Données protégées en continu" },
   { value: "24/7", label: "Disponibilité" },
 ];
 
+const demoAccounts = [
+  { role: "Admin",     email: "admin@sgh.sn",     password: "Admin@1234",     color: "#1a2332" },
+  { role: "Médecin",   email: "medecin@sgh.sn",   password: "Medecin@1234",   color: "#0a5c8a" },
+  { role: "Infirmier", email: "infirmier@sgh.sn", password: "Infirmier@1234", color: "#0f6e56" },
+  { role: "Patient",   email: "patient@sgh.sn",   password: "Patient@1234",   color: "#854f0b" },
+];
+
 export default function HomePage() {
   const navigate = useNavigate();
+  const [liveStats, setLiveStats] = React.useState(null);
+  const [modal, setModal] = React.useState(null); // "confidentialite" | "contact" | null
+  const [contactForm, setContactForm] = React.useState({ nom: "", email: "", sujet: "", message: "" });
+  const [contactSent, setContactSent] = React.useState(false);
+
+  React.useEffect(() => {
+    // Optionnel : tente de récupérer les stats publiques si déjà connecté
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch((process.env.REACT_APP_API_URL || "http://localhost:8000/api") + "/stats/dashboard", {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    }).then(r => r.ok ? r.json() : null).then(setLiveStats).catch(() => {});
+  }, []);
+
+  const stats = liveStats ? [
+    { value: liveStats.patients ?? 0,                label: "Patients enregistrés" },
+    { value: liveStats.medecins ?? 0,                label: "Médecins actifs" },
+    { value: liveStats.rendezvous_aujourd_hui ?? 0,  label: "Rendez-vous aujourd'hui" },
+    { value: liveStats.hospitalisations_en_cours ?? 0, label: "Hospitalisations" },
+  ] : defaultStats;
 
   return (
     <>
@@ -170,19 +198,7 @@ export default function HomePage() {
           zIndex: 100,
           boxShadow: "0 2px 16px rgba(10,92,138,0.18)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, background: "rgba(255,255,255,0.2)",
-              borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center"
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 3a1 1 0 011 1v3h3a1 1 0 010 2h-3v3a1 1 0 01-2 0v-3H8a1 1 0 010-2h3V7a1 1 0 011-1z"/>
-              </svg>
-            </div>
-            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: "#fff", fontWeight: 700, letterSpacing: "-0.3px" }}>
-              KDG Health
-            </span>
-          </div>
+          <Logo size={36} withText textColor="#fff" />
 
           {/* Boutons Connexion + Inscription */}
           <div style={{ display: "flex", gap: 10 }}>
@@ -207,6 +223,10 @@ export default function HomePage() {
           <div style={{ position:"absolute", top:-60, right:-60, width:280, height:280, borderRadius:"50%", background:"rgba(10,92,138,0.05)", pointerEvents:"none" }}/>
           <div style={{ position:"absolute", bottom:-80, left:-40, width:220, height:220, borderRadius:"50%", background:"rgba(15,110,86,0.05)", pointerEvents:"none" }}/>
 
+          <div className="anim anim-1" style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
+            <Logo variant="image" height={130} />
+          </div>
+
           <h1 className="anim anim-2" style={{
             fontFamily: "'Playfair Display', serif",
             fontSize: "clamp(36px, 5vw, 58px)",
@@ -216,8 +236,8 @@ export default function HomePage() {
             maxWidth: 680,
             margin: "0 auto 20px",
           }}>
-            Bienvenue au<br />
-            <span style={{ color: "#0a5c8a", fontStyle: "italic" }}>Système Hospitalier</span>
+            Bienvenue sur<br />
+            <span style={{ color: "#0a5c8a", fontStyle: "italic" }}>KDG Health</span>
           </h1>
 
           <p className="anim anim-3" style={{
@@ -284,6 +304,37 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Comptes de démo */}
+        <section style={{ padding: "20px 40px 60px", maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 14, padding: "28px 32px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#0a5c8a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+                  Accès rapide
+                </div>
+                <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: "#0d1f2d" }}>
+                  Comptes de démonstration
+                </h3>
+                <p style={{ fontSize: 13, color: "#7a90a0", marginTop: 4 }}>
+                  Testez les différents rôles avec ces identifiants pré-configurés
+                </p>
+              </div>
+              <button className="btn-register" onClick={() => navigate("/connexion")} style={{ color: "#0a5c8a", background: "#eef6fb" }}>
+                Aller à la connexion →
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              {demoAccounts.map(a => (
+                <div key={a.email} style={{ borderLeft: `3px solid ${a.color}`, background: "#f9fbfc", borderRadius: 8, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: a.color, textTransform: "uppercase", letterSpacing: 0.5 }}>{a.role}</div>
+                  <div style={{ fontSize: 13, color: "#0d1f2d", marginTop: 6, fontFamily: "monospace" }}>{a.email}</div>
+                  <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2, fontFamily: "monospace" }}>{a.password}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Footer */}
         <footer style={{
           background: "#0d1f2d",
@@ -294,22 +345,179 @@ export default function HomePage() {
           flexWrap: "wrap",
           gap: 12,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: "#fff", fontWeight: 700 }}>KDG Health</span>
-            <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>·</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Logo size={28} withText textColor="#fff" gap={8} />
+            <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, marginLeft: 4 }}>·</span>
             <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>© 2026 Tous droits réservés</span>
           </div>
           <div style={{ display: "flex", gap: 20 }}>
-            {["Confidentialité", "Contact"].map(l => (
-              <span
-                key={l}
-                style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, cursor: "pointer" }}
-                onMouseOver={e => e.target.style.color = "rgba(255,255,255,0.85)"}
-                onMouseOut={e => e.target.style.color = "rgba(255,255,255,0.45)"}
-              >{l}</span>
+            {[
+              { label: "Confidentialité", key: "confidentialite" },
+              { label: "Contact",         key: "contact" },
+            ].map(l => (
+              <button
+                key={l.key}
+                onClick={() => { setModal(l.key); setContactSent(false); }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255,255,255,0.55)",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  padding: 0,
+                  fontWeight: 500,
+                }}
+                onMouseOver={e => e.currentTarget.style.color = "rgba(255,255,255,0.95)"}
+                onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.55)"}
+              >
+                {l.label}
+              </button>
             ))}
           </div>
         </footer>
+
+        {/* ─── Modal Confidentialité / Contact ─── */}
+        {modal && (
+          <div
+            onClick={() => setModal(null)}
+            style={{
+              position: "fixed", inset: 0,
+              background: "rgba(13,31,45,0.65)",
+              backdropFilter: "blur(4px)",
+              zIndex: 200,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20,
+              animation: "fadeUp 0.2s ease",
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                maxWidth: 620,
+                width: "100%",
+                maxHeight: "85vh",
+                overflowY: "auto",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                animation: "fadeUp 0.3s ease",
+              }}
+            >
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "22px 28px",
+                borderBottom: "1px solid #e8edf2",
+                background: "linear-gradient(135deg, #eef6fb 0%, #fff 100%)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <Logo size={36} />
+                  <div>
+                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 19, fontWeight: 700, color: "#0d1f2d" }}>
+                      {modal === "confidentialite" ? "Politique de confidentialité" : "Nous contacter"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>
+                      {modal === "confidentialite" ? "Vos données médicales sont protégées" : "Une question ? Nous répondons sous 24h"}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setModal(null)} style={{
+                  background: "#f0f4f8", border: "none", width: 32, height: 32,
+                  borderRadius: 8, fontSize: 18, color: "#4a6070",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>×</button>
+              </div>
+
+              <div style={{ padding: "26px 28px" }}>
+                {modal === "confidentialite" ? (
+                  <div style={{ fontSize: 14, color: "#4a6070", lineHeight: 1.75 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0a5c8a", marginBottom: 8, marginTop: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Collecte des données
+                    </h3>
+                    <p style={{ marginBottom: 16 }}>
+                      KDG Health collecte uniquement les informations strictement nécessaires à la prise en charge médicale : identité, coordonnées, antécédents médicaux, allergies et historique des consultations.
+                    </p>
+
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0a5c8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Sécurité et stockage
+                    </h3>
+                    <p style={{ marginBottom: 16 }}>
+                      Toutes les données sont stockées sur des serveurs sécurisés au Sénégal. Elles sont chiffrées en transit (HTTPS) et au repos. Les mots de passe sont hachés avec bcrypt.
+                    </p>
+
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0a5c8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Accès aux données
+                    </h3>
+                    <p style={{ marginBottom: 16 }}>
+                      Seul le personnel médical autorisé (médecins, infirmiers, agents administratifs) a accès aux dossiers patients selon son rôle. Chaque action est tracée dans un journal d'audit.
+                    </p>
+
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0a5c8a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Vos droits
+                    </h3>
+                    <p style={{ marginBottom: 16 }}>
+                      Vous pouvez à tout moment accéder à vos données, demander leur correction ou leur suppression en contactant l'administrateur de l'établissement.
+                    </p>
+
+                    <div style={{ background: "#eef6fb", borderLeft: "3px solid #0a5c8a", padding: "12px 16px", borderRadius: 6, fontSize: 12, color: "#0a5c8a", marginTop: 18 }}>
+                      📅 Dernière mise à jour : juin 2026<br />
+                      📧 Délégué à la protection des données : <strong>dpo@kdghealth.sn</strong>
+                    </div>
+                  </div>
+                ) : contactSent ? (
+                  <div style={{ textAlign: "center", padding: "30px 10px" }}>
+                    <div style={{ fontSize: 48, marginBottom: 14 }}>✅</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#0f6e56", marginBottom: 8, fontFamily: "'Playfair Display',serif" }}>
+                      Message envoyé
+                    </div>
+                    <div style={{ fontSize: 13, color: "#4a6070", marginBottom: 22 }}>
+                      Merci ! Nous vous répondrons à <strong style={{ color: "#0d1f2d" }}>{contactForm.email}</strong> dans les plus brefs délais.
+                    </div>
+                    <button
+                      onClick={() => setModal(null)}
+                      style={{ background: "#0a5c8a", color: "#fff", border: "none", padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
+                      <div style={{ background: "#fafbfc", padding: "14px 16px", borderRadius: 10 }}>
+                        <div style={{ fontSize: 11, color: "#7a90a0", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>📍 Adresse</div>
+                        <div style={{ fontSize: 13, color: "#0d1f2d", fontWeight: 600 }}>Avenue Léopold Sédar Senghor<br />Dakar, Sénégal</div>
+                      </div>
+                      <div style={{ background: "#fafbfc", padding: "14px 16px", borderRadius: 10 }}>
+                        <div style={{ fontSize: 11, color: "#7a90a0", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>📞 Téléphone</div>
+                        <div style={{ fontSize: 13, color: "#0d1f2d", fontWeight: 600 }}>+221 33 800 00 00<br /><span style={{ fontSize: 11, color: "#7a90a0", fontWeight: 400 }}>Urgences : 1515 (24h/24)</span></div>
+                      </div>
+                    </div>
+
+                    <form onSubmit={e => {
+                      e.preventDefault();
+                      if (!contactForm.nom || !contactForm.email || !contactForm.message) return;
+                      setContactSent(true);
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                        <input required type="text" placeholder="Votre nom complet *" value={contactForm.nom} onChange={e => setContactForm({ ...contactForm, nom: e.target.value })}
+                          style={{ padding: "10px 14px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%" }} />
+                        <input required type="email" placeholder="Votre email *" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })}
+                          style={{ padding: "10px 14px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%" }} />
+                      </div>
+                      <input type="text" placeholder="Sujet" value={contactForm.sujet} onChange={e => setContactForm({ ...contactForm, sujet: e.target.value })}
+                        style={{ padding: "10px 14px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%", marginBottom: 12 }} />
+                      <textarea required rows={4} placeholder="Votre message *" value={contactForm.message} onChange={e => setContactForm({ ...contactForm, message: e.target.value })}
+                        style={{ padding: "10px 14px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%", resize: "vertical", marginBottom: 14 }} />
+                      <button type="submit" style={{ background: "#0a5c8a", color: "#fff", border: "none", padding: "11px 24px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", width: "100%" }}>
+                        Envoyer le message
+                      </button>
+                    </form>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </>

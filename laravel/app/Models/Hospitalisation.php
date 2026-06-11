@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 
 class Hospitalisation extends Model
 {
+    use Auditable;
+    protected $auditExclude = ['updated_at'];
+
+    public function getAuditLabel(): string
+    {
+        $p = $this->patient_id ? "Patient #{$this->patient_id}" : "Hospi";
+        return "{$p} · Ch. {$this->chambre} {$this->lit}";
+    }
     protected $fillable = [
         'patient_id',
         'medecin_id',
