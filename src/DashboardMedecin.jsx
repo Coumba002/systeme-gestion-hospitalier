@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MedecinConsultations from "./sections/MedecinConsultations";
-import { getStatsMedecin, getPatients, getRendezVous, getMessages, getPrescriptions, getUser, logout } from "./api";
+import MedecinRendezVous from "./sections/MedecinRendezVous";
+import Messagerie from "./sections/Messagerie";
+import Logo from "./components/Logo";
+import { useUnreadMessages } from "./hooks/useUnreadMessages";
+import { ThemeToggle } from "./hooks/useTheme";
+import { getStatsMedecin, getPatients, getRendezVous, getMessages, getPrescriptions, createPrescription, getMedecins, getUser, logout } from "./api";
  
 // ─── STYLES GLOBAUX ───────────────────────────────────────────────────────────
 const globalStyles = `
@@ -9,7 +14,11 @@ const globalStyles = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7fa; }
  
-  .sidebar { width: 240px; background: linear-gradient(180deg, #0a5c8a 0%, #0c6ea3 100%); min-height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; }
+  .sidebar { width: 240px; background: linear-gradient(180deg, #0a5c8a 0%, #0c6ea3 100%); height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 10; overflow-y: auto; overflow-x: hidden; }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
   .sidebar-logo { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; gap: 10px; }
   .sidebar-logo span { font-family: 'Playfair Display', serif; font-size: 18px; color: #fff; font-weight: 700; }
   .sidebar-menu { padding: 16px 12px; flex: 1; }
@@ -165,12 +174,15 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
           <div className="page-title">Tableau de bord — Médecin</div>
           <div className="page-sub">{dateAujourdhui} · Service de médecine interne</div>
         </div>
-        <div className="user-pill">
-          <div className="user-avatar">{initiales}</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#0d1f2d" }}>{prenom} {nom}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ThemeToggle />
+          <div className="user-pill">
+            <div className="user-avatar">{initiales}</div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{prenom} {nom}</span>
+          </div>
         </div>
       </div>
- 
+
       <div className="stats-grid">
         {[
           { icon: "👥", bg: "#eef6fb", value: stats?.patients_suivis || 0, label: "Patients suivis", delta: "Actifs", deltaColor: "#0f6e56" },
@@ -196,8 +208,8 @@ function SectionDashboard({ setActiveMenu, prenom, nom, initiales, dateAujourdhu
               {patients.slice(0, 5).map((p, i) => (
                 <tr key={i}>
                   <td><div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div></td>
-                  <td style={{ color: "#4a6070" }}>{p.telephone}</td>
-                  <td style={{ color: "#4a6070" }}>{p.groupe_sanguin}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.telephone}</td>
+                  <td style={{ color: "var(--text-secondary, #4a6070)" }}>{p.groupe_sanguin}</td>
                 </tr>
               ))}
             </tbody>
@@ -352,8 +364,8 @@ function SectionDossiers() {
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar initiales="FN" bg="#eef6fb" tc="#0a5c8a" size={48} />
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#0d1f2d" }}>Fatou Ndiaye</div>
-              <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2 }}>ID: SGH-2024-0041 · Chambre 204-A</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>Fatou Ndiaye</div>
+              <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2 }}>ID: KDG-2024-0041 · Chambre 204-A</div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
@@ -419,7 +431,7 @@ function SectionDossiers() {
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar initiales={(p.nom||"A")[0] + (p.prenom||"A")[0]} bg="#eef6fb" tc="#0a5c8a" size={44} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#0d1f2d" }}>{p.nom} {p.prenom}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>{p.nom} {p.prenom}</div>
               <div style={{ fontSize: 12, color: "#7a90a0" }}>ID: {p.id}</div>
             </div>
           </div>
@@ -430,79 +442,104 @@ function SectionDossiers() {
 }
  
 // ─── SECTION : ORDONNANCES ────────────────────────────────────────────────────
-function SectionOrdonnances() {
+function SectionOrdonnances({ medecinId }) {
   const [patients, setPatients] = React.useState([]);
   const [prescriptions, setPrescriptions] = React.useState([]);
+  const [msg, setMsg] = React.useState(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const empty = { patient_id: "", date_prescription: today, medicaments: "", dosage: "", frequence: "2 fois/jour", duree: "", instructions: "" };
+  const [form, setForm] = React.useState(empty);
 
-  React.useEffect(() => {
-    async function load() {
-      try {
-        const [p, pr] = await Promise.all([getPatients(), getPrescriptions()]);
-        setPatients(Array.isArray(p) ? p : p.data || []);
-        setPrescriptions(Array.isArray(pr) ? pr : pr.data || []);
-      } catch (e) { console.error(e); }
-    }
-    load();
-  }, []);
+  const load = async () => {
+    try {
+      const [p, pr] = await Promise.all([getPatients(), getPrescriptions()]);
+      setPatients(Array.isArray(p) ? p : p.data || []);
+      setPrescriptions(Array.isArray(pr) ? pr : pr.data || []);
+    } catch (e) { console.error(e); }
+  };
+  React.useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.patient_id || !form.medicaments) { setMsg({ type: "err", text: "Patient et médicament obligatoires" }); return; }
+    try {
+      await createPrescription({ ...form, medecin_id: medecinId });
+      setMsg({ type: "ok", text: "Ordonnance enregistrée" });
+      setForm(empty);
+      load();
+    } catch (e) { setMsg({ type: "err", text: e.message }); }
+  };
 
   return (
     <>
       <div className="pg-header">Ordonnances</div>
       <div className="pg-sub-text">Gestion et création des prescriptions médicales</div>
+      {msg && (
+        <div style={{ background: msg.type === "ok" ? "#e6f7f2" : "#fdeaea", color: msg.type === "ok" ? "#0f6e56" : "#c0392b", padding: "10px 16px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{msg.text}</div>
+      )}
       <div className="grid-2">
-        {/* Formulaire */}
         <div className="card">
           <div className="card-title">Nouvelle ordonnance</div>
           <div className="form-row">
             <div className="form-group">
-              <label>Patient</label>
-              <select>
-                {patients.map(p => <option key={p.id}>{p.nom} {p.prenom}</option>)}
+              <label>Patient *</label>
+              <select value={form.patient_id} onChange={e => setForm({ ...form, patient_id: e.target.value })}>
+                <option value="">-- Sélectionner --</option>
+                {patients.map(p => <option key={p.id} value={p.id}>{p.nom} {p.prenom}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label>Date</label>
-              <input type="date" defaultValue="2026-05-04" />
+              <input type="date" value={form.date_prescription} onChange={e => setForm({ ...form, date_prescription: e.target.value })} />
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#4a6070", marginBottom: 10 }}>Médicaments prescrits</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary, #4a6070)", marginBottom: 10 }}>Médicaments prescrits</div>
             <div style={{ background: "#f9fbfc", borderRadius: 8, padding: 14, marginBottom: 10 }}>
               <div className="form-row" style={{ marginBottom: 10 }}>
-                <div className="form-group"><label>Médicament</label><input type="text" defaultValue="Metformine" /></div>
-                <div className="form-group"><label>Dosage</label><input type="text" defaultValue="500mg" /></div>
+                <div className="form-group"><label>Médicament *</label><input type="text" value={form.medicaments} onChange={e => setForm({ ...form, medicaments: e.target.value })} placeholder="Ex: Metformine 500mg" /></div>
+                <div className="form-group"><label>Dosage</label><input type="text" value={form.dosage} onChange={e => setForm({ ...form, dosage: e.target.value })} placeholder="500mg" /></div>
               </div>
               <div className="form-row" style={{ marginBottom: 0 }}>
-                <div className="form-group"><label>Fréquence</label><select><option>2 fois/jour</option><option>1 fois/jour</option><option>3 fois/jour</option></select></div>
-                <div className="form-group"><label>Durée</label><input type="text" defaultValue="30 jours" /></div>
+                <div className="form-group"><label>Fréquence</label>
+                  <select value={form.frequence} onChange={e => setForm({ ...form, frequence: e.target.value })}>
+                    <option>1 fois/jour</option><option>2 fois/jour</option><option>3 fois/jour</option><option>Au besoin</option>
+                  </select>
+                </div>
+                <div className="form-group"><label>Durée</label><input type="text" value={form.duree} onChange={e => setForm({ ...form, duree: e.target.value })} placeholder="30 jours" /></div>
               </div>
             </div>
-            <button className="btn-secondary" style={{ width: "100%", fontSize: 12 }}>+ Ajouter un médicament</button>
           </div>
           <div className="form-group" style={{ marginBottom: 14 }}>
             <label>Instructions / Notes</label>
-            <textarea rows={3} placeholder="Instructions particulières pour le patient..." />
+            <textarea rows={3} value={form.instructions} onChange={e => setForm({ ...form, instructions: e.target.value })} placeholder="Instructions particulières pour le patient..." />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn-primary" style={{ flex: 1 }}>Valider l'ordonnance</button>
-            <button className="btn-secondary">Imprimer</button>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={save}>Valider l'ordonnance</button>
+            <button className="btn-secondary" onClick={() => window.print()}>Imprimer</button>
           </div>
         </div>
- 
-        {/* Historique */}
+
         <div className="card">
           <div className="card-title">Historique des ordonnances</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {prescriptions.map((o, i) => (
-              <div key={i} style={{ background: "#f9fbfc", borderRadius: 8, padding: "12px 14px", borderLeft: `3px solid #0f6e56` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 500, overflowY: "auto" }}>
+            {prescriptions.length === 0 && <div style={{ color: "#7a90a0", fontSize: 13, padding: 20, textAlign: "center" }}>Aucune ordonnance</div>}
+            {prescriptions.map((o) => (
+              <div key={o.id} style={{ background: "#f9fbfc", borderRadius: 8, padding: "12px 14px", borderLeft: `3px solid #0f6e56` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0d1f2d" }}>Patient #{o.patient_id}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary, #0d1f2d)" }}>
+                    {o.patient ? `${o.patient.nom} ${o.patient.prenom}` : `Patient #${o.patient_id}`}
+                  </div>
                   <span style={{ fontSize: 11, color: "#a0b0bc" }}>{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <div style={{ fontSize: 12, color: "#4a6070", marginTop: 4 }}>{o.medicaments}</div>
+                <div style={{ fontSize: 12, color: "var(--text-primary, #0d1f2d)", marginTop: 4, fontWeight: 600 }}>{o.medicaments}</div>
+                {(o.dosage || o.frequence || o.duree) && (
+                  <div style={{ fontSize: 11, color: "var(--text-secondary, #4a6070)", marginTop: 3 }}>
+                    {[o.dosage, o.frequence, o.duree].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                {o.instructions && <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 4, fontStyle: "italic" }}>{o.instructions}</div>}
               </div>
             ))}
-            {prescriptions.length === 0 && <div style={{color:"#7a90a0", fontSize:13}}>Aucune ordonnance</div>}
           </div>
         </div>
       </div>
@@ -555,6 +592,7 @@ export default function DashboardMedecin() {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [user, setUser] = useState(null);
   const [now, setNow] = useState(new Date());
+  const unreadCount = useUnreadMessages(user?.id);
 
   useEffect(() => {
     const u = getUser();
@@ -570,15 +608,29 @@ export default function DashboardMedecin() {
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "DR";
   const dateAujourdhui = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " - " + now.toLocaleTimeString("fr-FR");
 
+  const [medecinId, setMedecinId] = useState(null);
+  useEffect(() => {
+    async function findMedecin() {
+      try {
+        const meds = await getMedecins();
+        const list = Array.isArray(meds) ? meds : meds.data || [];
+        const u = getUser();
+        const mine = list.find(m => m.user_id === u?.id);
+        if (mine) setMedecinId(mine.id);
+      } catch (e) {}
+    }
+    findMedecin();
+  }, []);
+
   const renderSection = () => {
     switch (activeMenu) {
       case "dashboard":    return <SectionDashboard setActiveMenu={setActiveMenu} prenom={prenom} nom={nom} initiales={initiales} dateAujourdhui={dateAujourdhui} />;
       case "patients":     return <SectionPatients setActiveMenu={setActiveMenu} />;
-      case "rdv":          return <SectionRdv />;
+      case "rdv":          return <MedecinRendezVous medecinId={medecinId} />;
       case "consultations":return <MedecinConsultations />;
       case "dossiers":     return <SectionDossiers />;
-      case "ordonnances":  return <SectionOrdonnances />;
-      case "messagerie":   return <SectionMessagerie />;
+      case "ordonnances":  return <SectionOrdonnances medecinId={medecinId} />;
+      case "messagerie":   return <Messagerie accentColor="#0a5c8a" />;
       default:             return null;
     }
   };
@@ -591,12 +643,7 @@ export default function DashboardMedecin() {
         {/* Sidebar */}
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div style={{ width: 32, height: 32, background: "rgba(255,255,255,0.2)", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 3a1 1 0 011 1v3h3a1 1 0 010 2h-3v3a1 1 0 01-2 0v-3H8a1 1 0 010-2h3V7a1 1 0 011-1z" />
-              </svg>
-            </div>
-            <span>KDG Health</span>
+            <Logo size={36} withText textColor="#fff" subtitleColor="rgba(255,255,255,0.7)" gap={10} />
           </div>
  
           <div className="sidebar-menu">
@@ -608,9 +655,21 @@ export default function DashboardMedecin() {
                 onClick={() => setActiveMenu(item.key)}
               >
                 <span style={{ fontSize: 16 }}>{item.icon}</span>
-                {item.label}
-                {item.key === "messagerie" && (
-                  <span style={{ background: "#c0392b", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 8, marginLeft: "auto" }}>2</span>
+                <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+                {item.key === "messagerie" && unreadCount > 0 && (
+                  <span style={{
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    minWidth: 18,
+                    textAlign: "center",
+                    boxShadow: "0 0 0 2px rgba(239,68,68,0.2)",
+                  }}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
                 )}
               </button>
             ))}

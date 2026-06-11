@@ -2,10 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 
 class Facture extends Model
 {
+    use Auditable;
+    protected $auditExclude = ['updated_at'];
+
+    public function getAuditLabel(): string
+    {
+        return "Facture #{$this->id} · " . number_format((float)$this->montant_total, 0, ',', ' ') . " F";
+    }
     protected $fillable = [
         'patient_id',
         'consultation_id',

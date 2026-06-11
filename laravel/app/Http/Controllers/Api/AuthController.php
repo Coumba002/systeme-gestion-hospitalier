@@ -3,53 +3,62 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
+use App\Models\Patient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Inscription d'un nouvel utilisateur.
-     * POST /api/register
-     */
     public function register(Request $request)
-{
-    $validated = $request->validate([
-        'name'      => 'required|string|max:255',
-        'email'     => 'required|string|email|max:255|unique:users',
-        'password'  => 'required|string|min:8',
-        'prenom'    => 'nullable|string|max:100',
-        'nom'       => 'nullable|string|max:100',
-        'telephone' => 'nullable|string|max:20',
-    ]);
+    {
+        $validated = $request->validate([
+            'name'      => 'nullable|string|max:255',
+            'email'     => 'required|string|email|max:255|unique:users',
+            'password'  => 'required|string|min:8',
+            'prenom'    => 'nullable|string|max:100',
+            'nom'       => 'nullable|string|max:100',
+            'telephone' => 'nullable|string|max:20',
+        ]);
 
-    $patientRoleId = \Illuminate\Support\Facades\DB::table('roles')->where('nom', 'patient')->value('id');
+        $patientRoleId = DB::table('roles')->where('nom', 'patient')->value('id');
 
-    $user = User::create([
-        'nom'      => $validated['nom'] ?? $validated['name'],
-        'prenom'   => $validated['prenom'] ?? '',
-        'email'    => $validated['email'],
-        'password' => Hash::make($validated['password']),
-        'telephone'=> $validated['telephone'] ?? null,
-        'role_id'  => $patientRoleId ?? 3, // patient
-        'role'     => 'patient',
-    ]);
+        $user = User::create([
+            'nom'      => $validated['nom'] ?? $validated['name'] ?? 'Patient',
+            'prenom'   => $validated['prenom'] ?? '',
+            'email'    => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'telephone'=> $validated['telephone'] ?? null,
+            'role_id'  => $patientRoleId ?? 3,
+            'role'     => 'patient',
+            'statut'   => 'actif',
+        ]);
 
-    $token = $user->createToken('auth_token')->plainTextToken;
+        Patient::create([
+            'user_id'   => $user->id,
+            'nom'       => $user->nom,
+            'prenom'    => $user->prenom,
+            'telephone' => $user->telephone,
+            'email'     => $user->email,
+        ]);
 
-    return response()->json([
-        'token' => $token,
-        'user'  => [
-            'id'    => $user->id,
-            'nom'   => $user->nom,
-            'prenom'=> $user->prenom,
-            'email' => $user->email,
-            'role'  => 'patient',
-        ],
-    ], 201);
-}
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user'  => [
+                'id'     => $user->id,
+                'nom'    => $user->nom,
+                'prenom' => $user->prenom,
+                'email'  => $user->email,
+                'role'   => 'patient',
+            ],
+        ], 201);
+    }
+
     public function login(Request $request)
     {
         $request->validate([
@@ -59,43 +68,55 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            AuditLog::record([
+                'action'       => 'login_failed',
+                'entity_type'  => 'User',
+                'entity_label' => $request->email,
+            ]);
             throw ValidationException::withMessages([
                 'email' => ['Identifiants incorrects.'],
             ]);
         }
 
-        // Révoquer les anciens tokens (une session à la fois)
         $user->tokens()->delete();
-
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        AuditLog::record([
+            'user_id'      => $user->id,
+            'user_name'    => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
+            'user_role'    => $user->role,
+            'action'       => 'login',
+            'entity_type'  => 'User',
+            'entity_id'    => $user->id,
+            'entity_label' => $user->email,
+        ]);
 
         return response()->json([
             'token' => $token,
             'user'  => [
-                'id'    => $user->id,
-                'nom'  => $user->name,
+                'id'     => $user->id,
+                'nom'    => $user->nom,
                 'prenom' => $user->prenom,
-                'email' => $user->email,
-                'role'  => $user->role,
+                'email'  => $user->email,
+                'role'   => $user->role,
             ],
         ]);
     }
 
-    /**
-     * Déconnexion.
-     * POST /api/logout  (nécessite auth:sanctum)
-     */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        AuditLog::record([
+            'action'       => 'logout',
+            'entity_type'  => 'User',
+            'entity_id'    => $user?->id,
+            'entity_label' => $user?->email,
+        ]);
+        $user->currentAccessToken()->delete();
         return response()->json(['message' => 'Déconnecté avec succès']);
     }
 
-    /**
-     * Utilisateur connecté.
-     * GET /api/me  (nécessite auth:sanctum)
-     */
     public function me(Request $request)
     {
         return response()->json($request->user());

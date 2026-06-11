@@ -2,21 +2,33 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 
 class Prescription extends Model
 {
-    //
+    use Auditable;
+    protected $auditExclude = ['updated_at'];
+
+    public function getAuditLabel(): string
+    {
+        return "Ordonnance #{$this->id} · " . mb_substr((string)$this->medicaments, 0, 50);
+    }
     protected $fillable = [
         'patient_id',
         'medecin_id',
+        'consultation_id',
         'date_prescription',
-        'medications',
+        'medicaments',
         'dosage',
-        'frequency',
-        'duration',
+        'frequence',
+        'duree',
         'instructions',
-        'status',
+        'statut',
+    ];
+
+    protected $casts = [
+        'date_prescription' => 'date',
     ];
 
     public function patient()
@@ -29,8 +41,8 @@ class Prescription extends Model
         return $this->belongsTo(Medecin::class);
     }
 
-    public function facture()
+    public function consultation()
     {
-        return $this->hasOne(Facture::class);
+        return $this->belongsTo(Consultation::class);
     }
 }

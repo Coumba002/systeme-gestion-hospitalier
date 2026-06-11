@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "./api";
+import Logo from "./components/Logo";
 
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
@@ -131,14 +132,7 @@ export default function ConnexionPage() {
           alignItems: "center", height: "64px",
           boxShadow: "0 2px 16px rgba(10,92,138,0.18)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: "rgba(255,255,255,0.2)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 3a1 1 0 011 1v3h3a1 1 0 010 2h-3v3a1 1 0 01-2 0v-3H8a1 1 0 010-2h3V7a1 1 0 011-1z"/>
-              </svg>
-            </div>
-            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: "#fff", fontWeight: 700 }}>KDG Health</span>
-          </div>
+          <Logo size={36} withText textColor="#fff" />
           <button onClick={() => navigate("/")}
             style={{ background: "transparent", border: "1.5px solid rgba(255,255,255,0.6)", color: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 600, padding: "8px 20px", borderRadius: 6, cursor: "pointer" }}>
             ← Retour
@@ -154,13 +148,9 @@ export default function ConnexionPage() {
           }}>
 
             {/* En-tête */}
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <div style={{ width: 56, height: 56, background: "#eef6fb", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="#0a5c8a" strokeWidth="1.5"/>
-                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="#0a5c8a" strokeWidth="1.5" strokeLinecap="round"/>
-                  <circle cx="12" cy="16" r="1.5" fill="#0a5c8a"/>
-                </svg>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                <Logo variant="image" height={80} />
               </div>
               <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: "#0d1f2d", marginBottom: 6 }}>
                 Connexion
@@ -247,7 +237,7 @@ export default function ConnexionPage() {
 
         {/* Footer */}
         <footer style={{ background: "#0d1f2d", padding: "16px 40px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: "#fff", fontWeight: 700 }}>KDG Health</span>
+          <Logo size={26} withText textColor="#fff" gap={8} />
           <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>© 2026 Tous droits réservés</span>
         </footer>
 

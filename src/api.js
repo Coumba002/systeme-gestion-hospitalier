@@ -453,3 +453,18 @@ export async function getStatsPatient() {
   if (!res.ok) throw new Error(data.message || "Erreur chargement stats patient");
   return data;
 }
+
+// ─── Audit logs (admin) ───────────────────────────────────────────────────────
+export async function getAuditLogs(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${API_BASE}/audit-logs${qs ? "?" + qs : ""}`, { headers: headers() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Erreur chargement audit logs");
+  return data;
+}
+export async function getAuditStats() {
+  const res = await fetch(`${API_BASE}/audit-logs/stats`, { headers: headers() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Erreur chargement stats audit");
+  return data;
+}

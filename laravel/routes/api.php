@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConsultationController;
 use App\Http\Controllers\Api\HospitalisationController;
 use App\Http\Controllers\Api\FactureController;
+use App\Http\Controllers\Api\AuditLogController;
 
 // ─── Auth (public) ────────────────────────────────────────────────────────────
 Route::post('/register', [AuthController::class, 'register']);
@@ -24,7 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Ressources CRUD standard ──────────────────────────────────────────────
     Route::apiResource('patients',      PatientController::class);
     Route::apiResource('prescriptions', PrescriptionController::class);
-    Route::apiResource('rendezvous',    RendezVousController::class);
+    Route::apiResource('rendezvous',    RendezVousController::class)->parameters(['rendezvous' => 'rendezvous']);
     Route::apiResource('users',         UserController::class);
     Route::apiResource('medecins',      MedecinController::class);
     Route::apiResource('infirmiers',    InfirmierController::class);
@@ -43,6 +44,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Marquer un message comme lu
     Route::post('messages/{message}/lu', [\App\Http\Controllers\MessageController::class, 'markAsRead']);
+
+    // ── Audit logs (admin uniquement) ─────────────────────────────────────────
+    Route::get('audit-logs',       [AuditLogController::class, 'index']);
+    Route::get('audit-logs/stats', [AuditLogController::class, 'stats']);
 
     // ── Statistiques & Rapports ───────────────────────────────────────────────
     Route::get('stats/dashboard', function () {

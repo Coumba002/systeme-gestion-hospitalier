@@ -11,6 +11,17 @@ class ResultatExamen extends Model
         'valeurs_reference', 'interpretation', 'date_examen'
     ];
 
+    protected $casts = [
+        'date_examen' => 'date',
+    ];
+
+    protected $appends = ['type_examen'];
+
+    public function getTypeExamenAttribute()
+    {
+        return $this->nom_examen;
+    }
+
     public function patient()
     {
         return $this->belongsTo(Patient::class);
