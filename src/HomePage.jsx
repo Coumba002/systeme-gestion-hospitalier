@@ -150,13 +150,6 @@ const defaultStats = [
   { value: "24/7", label: "Disponibilité" },
 ];
 
-const demoAccounts = [
-  { role: "Admin",     email: "admin@sgh.sn",     password: "Admin@1234",     color: "#1a2332" },
-  { role: "Médecin",   email: "medecin@sgh.sn",   password: "Medecin@1234",   color: "#0a5c8a" },
-  { role: "Infirmier", email: "infirmier@sgh.sn", password: "Infirmier@1234", color: "#0f6e56" },
-  { role: "Patient",   email: "patient@sgh.sn",   password: "Patient@1234",   color: "#854f0b" },
-];
-
 export default function HomePage() {
   const navigate = useNavigate();
   const [liveStats, setLiveStats] = React.useState(null);
@@ -301,37 +294,6 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* Comptes de démo */}
-        <section style={{ padding: "20px 40px 60px", maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ background: "#fff", border: "1px solid #e8edf2", borderRadius: 14, padding: "28px 32px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#0a5c8a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
-                  Accès rapide
-                </div>
-                <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: "#0d1f2d" }}>
-                  Comptes de démonstration
-                </h3>
-                <p style={{ fontSize: 13, color: "#7a90a0", marginTop: 4 }}>
-                  Testez les différents rôles avec ces identifiants pré-configurés
-                </p>
-              </div>
-              <button className="btn-register" onClick={() => navigate("/connexion")} style={{ color: "#0a5c8a", background: "#eef6fb" }}>
-                Aller à la connexion →
-              </button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-              {demoAccounts.map(a => (
-                <div key={a.email} style={{ borderLeft: `3px solid ${a.color}`, background: "#f9fbfc", borderRadius: 8, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: a.color, textTransform: "uppercase", letterSpacing: 0.5 }}>{a.role}</div>
-                  <div style={{ fontSize: 13, color: "#0d1f2d", marginTop: 6, fontFamily: "monospace" }}>{a.email}</div>
-                  <div style={{ fontSize: 12, color: "#7a90a0", marginTop: 2, fontFamily: "monospace" }}>{a.password}</div>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
