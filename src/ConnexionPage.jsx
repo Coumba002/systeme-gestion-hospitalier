@@ -112,6 +112,7 @@ export default function ConnexionPage() {
       const role = user?.role?.toLowerCase() || "";
       if (role === "admin") navigate("/dashboard/admin");
       else if (role === "medecin") navigate("/dashboard/medecin");
+      else if (role === "infirmier" || role === "infirmiere" || role === "infirmiere") navigate("/dashboard/infirmier");
       else navigate("/dashboard/patient");
     } catch (err) {
       setErreur(err.message || "Identifiants incorrects");
