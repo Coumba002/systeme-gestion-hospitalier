@@ -254,3 +254,87 @@ export function printFacture({ facture, patient }) {
 
   openPrint(html, `Facture #${facture.id}`);
 }
+
+// ─── Export RAPPORT ADMINISTRATIF ──────────────────────────────────────────────
+/**
+ * Génère un rapport PDF avec stats consolidées.
+ * @param {Object} opts
+ * @param {string} opts.titre           — Ex: "Rapport mensuel"
+ * @param {string} opts.periode         — Ex: "Avril 2026"
+ * @param {Array<{label, value, color?}>} opts.kpis  — Cartes statistiques
+ * @param {Array<{titre, lignes}>} opts.sections     — Sections détaillées (tables)
+ */
+export function printRapport({ titre, periode, kpis = [], sections = [] }) {
+  const html = `
+    <div class="pdf-header">
+      ${brandHeader()}
+      <div class="pdf-meta">
+        <strong>${titre.toUpperCase()}</strong><br>
+        ${periode}<br>
+        Édité le ${new Date().toLocaleDateString("fr-FR", { dateStyle: "long" })}
+      </div>
+    </div>
+
+    ${kpis.length > 0 ? `
+      <div class="pdf-section">
+        <div class="pdf-section-title">Indicateurs clés</div>
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(kpis.length, 4)},1fr);gap:14px;">
+          ${kpis.map(k => `
+            <div style="background:#f9fbfc;border-left:3px solid ${k.color || "#0a5c8a"};border-radius:6px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:700;color:#7a90a0;text-transform:uppercase;letter-spacing:0.05em;">${k.label}</div>
+              <div style="font-size:22px;font-weight:800;color:${k.color || "#0a5c8a"};margin-top:4px;">${k.value}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    ` : ""}
+
+    ${sections.map(s => `
+      <div class="pdf-section">
+        <div class="pdf-section-title">${s.titre}</div>
+        ${s.lignes && s.lignes.length > 0 ? `
+          <table class="pdf-table">
+            ${s.colonnes ? `<thead><tr>${s.colonnes.map(c => `<th>${c}</th>`).join("")}</tr></thead>` : ""}
+            <tbody>
+              ${s.lignes.map(l => `<tr>${l.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+        ` : `<div style="padding:14px;color:#7a90a0;font-size:12px;font-style:italic;">Aucune donnée pour cette période</div>`}
+      </div>
+    `).join("")}
+
+    <div class="pdf-signature">
+      <div class="line"></div>
+      <div class="name">Direction administrative</div>
+      <div style="font-size:9px;color:#7a90a0;margin-top:2px;">Signature & cachet</div>
+    </div>
+
+    <div class="pdf-footer">
+      <div><strong style="color:#0d1f2d;">KDG Health</strong> · Hôpital de référence · Dakar, Sénégal</div>
+      <div>Document confidentiel · ${new Date().toLocaleString("fr-FR")}</div>
+    </div>
+  `;
+  openPrint(html, `${titre} — ${periode}`);
+}
+
+// ─── Export CSV générique ─────────────────────────────────────────────────────
+export function downloadCSV(filename, headers, rows) {
+  const escape = (v) => {
+    const s = String(v ?? "");
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [
+    headers.map(escape).join(";"),
+    ...rows.map(r => r.map(escape).join(";")),
+  ];
+  const bom = "﻿"; // pour Excel français
+  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}

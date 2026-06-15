@@ -286,12 +286,6 @@ export default function HomePage() {
                 <p style={{ fontSize: 14, color: "#5a7080", lineHeight: 1.7, fontWeight: 400 }}>
                   {f.desc}
                 </p>
-                <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: f.accent, fontSize: 13, fontWeight: 600 }}>
-                  En savoir plus
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </div>
               </div>
             ))}
           </div>
