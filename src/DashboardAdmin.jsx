@@ -13,7 +13,8 @@ import { useUnreadMessages } from "./hooks/useUnreadMessages";
 import { ThemeToggle } from "./hooks/useTheme";
 import AdminCharts from "./sections/AdminCharts";
 import AdminAuditLog from "./sections/AdminAuditLog";
-import { getMedecins, createMedecin, deleteMedecin, getPatients, deletePatient, getStatsDashboard, getRendezVous, getUser, logout } from "./api";
+import { getMedecins, createMedecin, deleteMedecin, getPatients, deletePatient, getStatsDashboard, getRendezVous, getUser, logout, getConsultations, getHospitalisations, getFactures } from "./api";
+import { printRapport, downloadCSV } from "./utils/printPdf";
 
 // ─── STYLES GLOBAUX ───────────────────────────────────────────────────────────
 const globalStyles = `
@@ -508,73 +509,260 @@ function SectionStats() {
 
 // ─── SECTION : RAPPORTS ───────────────────────────────────────────────────────
 function SectionRapports() {
+  const [type, setType] = useState("mensuel");
+  const [periode, setPeriode] = useState(() => new Date().toISOString().slice(0, 7)); // "2026-06"
+  const [format, setFormat] = useState("pdf");
+  const [generating, setGenerating] = useState(false);
+  const [data, setData] = useState({ patients: [], medecins: [], rdvs: [], consultations: [], hospitalisations: [], factures: [] });
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [p, m, r, c, h, f] = await Promise.all([
+          getPatients(), getMedecins(), getRendezVous(),
+          getConsultations(), getHospitalisations(), getFactures(),
+        ]);
+        const norm = (x) => Array.isArray(x) ? x : x.data || [];
+        setData({
+          patients: norm(p), medecins: norm(m), rdvs: norm(r),
+          consultations: norm(c), hospitalisations: norm(h), factures: norm(f),
+        });
+      } catch (e) { setMsg({ type: "err", text: e.message }); }
+    })();
+  }, []);
+
+  // Filtre les données selon le type de rapport et la période
+  const filtrerParPeriode = (items, dateField) => {
+    if (!periode) return items;
+    if (type === "mensuel") {
+      // Format: "2026-06"
+      return items.filter(it => it[dateField] && it[dateField].slice(0, 7) === periode);
+    }
+    if (type === "trimestriel") {
+      // Format: "2026-Q1"
+      const [yr, q] = periode.split("-Q");
+      const qStart = (parseInt(q) - 1) * 3;
+      return items.filter(it => {
+        if (!it[dateField]) return false;
+        const d = new Date(it[dateField]);
+        return d.getFullYear() === parseInt(yr) && d.getMonth() >= qStart && d.getMonth() < qStart + 3;
+      });
+    }
+    if (type === "annuel") {
+      return items.filter(it => it[dateField] && it[dateField].slice(0, 4) === periode);
+    }
+    return items;
+  };
+
+  const getTitre = () => {
+    const map = { mensuel: "Rapport mensuel", trimestriel: "Rapport trimestriel", annuel: "Rapport annuel", medecins: "Liste des médecins" };
+    return map[type] || "Rapport";
+  };
+
+  const getPeriodeLabel = () => {
+    if (type === "medecins") return "Établissement";
+    if (type === "annuel") return periode;
+    if (type === "trimestriel") return periode.replace("-", " · ");
+    // mensuel
+    const [yr, m] = periode.split("-");
+    const mois = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+    return `${mois[parseInt(m) - 1]} ${yr}`;
+  };
+
+  const genererRapport = async () => {
+    setGenerating(true);
+    try {
+      const consultationsPeriode = filtrerParPeriode(data.consultations, "date_consultation");
+      const rdvsPeriode = filtrerParPeriode(data.rdvs, "date_heure");
+      const hospiPeriode = filtrerParPeriode(data.hospitalisations, "date_entree");
+      const facturesPeriode = filtrerParPeriode(data.factures, "date_emission");
+      const totalCA = facturesPeriode.reduce((s, f) => s + parseFloat(f.montant_paye || 0), 0);
+
+      if (type === "medecins") {
+        // Rapport spécial : liste des médecins
+        if (format === "csv") {
+          downloadCSV(
+            `medecins_actifs_${new Date().toISOString().slice(0,10)}`,
+            ["ID", "Nom", "Prénom", "Spécialité", "Téléphone", "Email", "N° Ordre"],
+            data.medecins.map(m => [m.id, m.nom, m.prenom, m.specialite, m.telephone, m.email, m.numero_ordre])
+          );
+          setMsg({ type: "ok", text: "CSV téléchargé" });
+        } else {
+          printRapport({
+            titre: "Liste des médecins actifs",
+            periode: getPeriodeLabel(),
+            kpis: [
+              { label: "Médecins actifs", value: data.medecins.length, color: "#0a5c8a" },
+              { label: "Spécialités", value: new Set(data.medecins.map(m => m.specialite).filter(Boolean)).size, color: "#7c3aed" },
+            ],
+            sections: [{
+              titre: "Liste détaillée",
+              colonnes: ["Nom", "Prénom", "Spécialité", "Téléphone", "N° Ordre"],
+              lignes: data.medecins.map(m => [`Dr. ${m.nom}`, m.prenom || "—", m.specialite || "—", m.telephone || "—", m.numero_ordre || "—"]),
+            }],
+          });
+          setMsg({ type: "ok", text: "Rapport généré" });
+        }
+        setGenerating(false);
+        return;
+      }
+
+      // Rapports mensuel/trimestriel/annuel : stats consolidées
+      const kpis = [
+        { label: "Patients enregistrés", value: data.patients.length, color: "#0a5c8a" },
+        { label: "Consultations", value: consultationsPeriode.length, color: "#7c3aed" },
+        { label: "Rendez-vous", value: rdvsPeriode.length, color: "#854f0b" },
+        { label: "Hospitalisations", value: hospiPeriode.length, color: "#c0392b" },
+        { label: "Factures émises", value: facturesPeriode.length, color: "#0f6e56" },
+        { label: "CA encaissé (F CFA)", value: totalCA.toLocaleString("fr-FR"), color: "#0f6e56" },
+      ];
+
+      const sections = [
+        {
+          titre: "Activité médicale",
+          colonnes: ["Type", "Nombre", "Détails"],
+          lignes: [
+            ["Consultations réalisées", consultationsPeriode.filter(c => c.statut === "realisee").length, ""],
+            ["Consultations planifiées", consultationsPeriode.filter(c => c.statut === "planifiee").length, ""],
+            ["Hospitalisations en cours", hospiPeriode.filter(h => h.statut === "en_cours").length, ""],
+            ["Hospitalisations terminées", hospiPeriode.filter(h => h.statut === "sortie").length, ""],
+          ],
+        },
+        {
+          titre: "Rendez-vous",
+          colonnes: ["Statut", "Nombre"],
+          lignes: [
+            ["Confirmés", rdvsPeriode.filter(r => r.statut === "confirme").length],
+            ["En attente", rdvsPeriode.filter(r => r.statut === "en_attente").length],
+            ["Réalisés", rdvsPeriode.filter(r => r.statut === "realise").length],
+            ["Annulés", rdvsPeriode.filter(r => r.statut === "annule").length],
+          ],
+        },
+        {
+          titre: "Facturation",
+          colonnes: ["Statut", "Nombre", "Montant total (F)"],
+          lignes: [
+            ["Payées",      facturesPeriode.filter(f => f.statut === "payee").length,      facturesPeriode.filter(f => f.statut === "payee").reduce((s,f) => s + parseFloat(f.montant_total||0), 0).toLocaleString("fr-FR")],
+            ["En attente",  facturesPeriode.filter(f => f.statut === "en_attente").length, facturesPeriode.filter(f => f.statut === "en_attente").reduce((s,f) => s + parseFloat(f.montant_total||0), 0).toLocaleString("fr-FR")],
+            ["Partielles",  facturesPeriode.filter(f => f.statut === "partielle").length,  facturesPeriode.filter(f => f.statut === "partielle").reduce((s,f) => s + parseFloat(f.montant_total||0), 0).toLocaleString("fr-FR")],
+          ],
+        },
+      ];
+
+      if (format === "csv") {
+        downloadCSV(
+          `${type}_${periode}`,
+          ["Indicateur", "Valeur"],
+          kpis.map(k => [k.label, k.value]).concat(
+            sections.flatMap(s => s.lignes.map(l => [`${s.titre} - ${l[0]}`, l[1]]))
+          )
+        );
+        setMsg({ type: "ok", text: "CSV téléchargé" });
+      } else {
+        printRapport({
+          titre: getTitre(),
+          periode: getPeriodeLabel(),
+          kpis,
+          sections,
+        });
+        setMsg({ type: "ok", text: "Rapport généré — utilisez l'aperçu pour enregistrer en PDF" });
+      }
+    } catch (e) {
+      setMsg({ type: "err", text: e.message });
+    }
+    setGenerating(false);
+  };
+
+  // Options de période selon le type
+  const renderPeriodeOptions = () => {
+    if (type === "medecins") return <option value="">Tous</option>;
+    const now = new Date();
+    if (type === "annuel") {
+      return [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map(y =>
+        <option key={y} value={String(y)}>{y}</option>
+      );
+    }
+    if (type === "trimestriel") {
+      const opts = [];
+      for (let q = 4; q >= 1; q--) opts.push(`${now.getFullYear()}-Q${q}`);
+      for (let q = 4; q >= 1; q--) opts.push(`${now.getFullYear() - 1}-Q${q}`);
+      return opts.map(p => <option key={p} value={p}>{p.replace("-", " · ")}</option>);
+    }
+    // mensuel : 12 derniers mois
+    const opts = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = d.toISOString().slice(0, 7);
+      const lbl = d.toLocaleString("fr-FR", { month: "long", year: "numeric" });
+      opts.push(<option key={val} value={val}>{lbl.charAt(0).toUpperCase() + lbl.slice(1)}</option>);
+    }
+    return opts;
+  };
+
   return (
     <>
       <div className="pg-header">Rapports</div>
-      <div className="pg-sub-text">Génération et téléchargement des rapports administratifs</div>
+      <div className="pg-sub-text">Génération de rapports basés sur les données réelles du système</div>
+
+      {msg && (
+        <div style={{ background: msg.type === "ok" ? "#e6f7f2" : "#fdeaea", color: msg.type === "ok" ? "#0f6e56" : "#c0392b", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+          {msg.text}
+        </div>
+      )}
 
       <div className="grid-2">
-        <div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card-title">Générer un rapport</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { label: "Type de rapport", type: "select", options: ["Rapport mensuel", "Rapport trimestriel", "Rapport annuel", "Rapport par médecin"] },
-                { label: "Période", type: "select", options: ["Avril 2026", "Mars 2026", "Février 2026", "Q1 2026"] },
-                { label: "Format", type: "select", options: ["PDF", "Excel", "CSV"] },
-              ].map(({ label, type, options }) => (
-                <div key={label} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>{label}</label>
-                  <select style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
-                    {options.map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
-              <button className="btn-primary" style={{ marginTop: 6 }}>Générer le rapport</button>
+        <div className="card">
+          <div className="card-title">Générer un rapport</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>Type de rapport</label>
+              <select value={type} onChange={e => setType(e.target.value)} style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
+                <option value="mensuel">📅 Rapport mensuel</option>
+                <option value="trimestriel">📊 Rapport trimestriel</option>
+                <option value="annuel">📆 Rapport annuel</option>
+                <option value="medecins">👨‍⚕️ Liste des médecins</option>
+              </select>
             </div>
-          </div>
-
-          <div className="card">
-            <div className="card-title">Rapports programmés</div>
-            {[
-              { nom: "Rapport mensuel automatique", freq: "Le 1er de chaque mois", proch: "01 juin 2026", statut: "actif" },
-              { nom: "Rapport hebdomadaire RDV", freq: "Tous les lundis", proch: "11 mai 2026", statut: "actif" },
-              { nom: "Rapport qualité trimestriel", freq: "Chaque trimestre", proch: "01 juil. 2026", statut: "actif" },
-            ].map((r, i) => (
-              <div key={i} style={{ padding: "10px 0", borderBottom: i < 2 ? "1px solid #f0f4f8" : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)" }}>{r.nom}</div>
-                    <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.freq} · Prochain : {r.proch}</div>
-                  </div>
-                  <Badge statut={r.statut} />
-                </div>
-              </div>
-            ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>Période</label>
+              <select value={periode} onChange={e => setPeriode(e.target.value)} disabled={type === "medecins"} style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
+                {renderPeriodeOptions()}
+              </select>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary, #4a6070)" }}>Format</label>
+              <select value={format} onChange={e => setFormat(e.target.value)} style={{ padding: "9px 12px", border: "1px solid #e8edf2", borderRadius: 8, fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", color: "var(--text-primary, #0d1f2d)", outline: "none" }}>
+                <option value="pdf">📄 PDF (mise en page complète)</option>
+                <option value="csv">📋 CSV (données brutes)</option>
+              </select>
+            </div>
+            <button onClick={genererRapport} disabled={generating} className="btn-primary" style={{ marginTop: 6 }}>
+              {generating ? "Génération..." : "↓ Générer le rapport"}
+            </button>
           </div>
         </div>
 
         <div className="card">
-          <div className="card-title">Rapports récents</div>
-          {[
-            { nom: "Rapport mensuel — Avril 2026", date: "01 mai 2026", taille: "2.4 MB", type: "PDF", color: "#c0392b" },
-            { nom: "Rapport mensuel — Mars 2026", date: "01 avr. 2026", taille: "2.1 MB", type: "PDF", color: "#c0392b" },
-            { nom: "Rapport qualité — Q1 2026", date: "01 avr. 2026", taille: "3.8 MB", type: "PDF", color: "#c0392b" },
-            { nom: "Statistiques RDV — Mars 2026", date: "31 mars 2026", taille: "0.9 MB", type: "Excel", color: "#0f6e56" },
-            { nom: "Liste médecins actifs", date: "28 mars 2026", taille: "0.3 MB", type: "CSV", color: "#0a5c8a" },
-            { nom: "Rapport mensuel — Février 2026", date: "01 mars 2026", taille: "1.9 MB", type: "PDF", color: "#c0392b" },
-          ].map((r, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < 5 ? "1px solid #f0f4f8" : "none" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: `${r.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: r.color }}>{r.type}</span>
+          <div className="card-title">Aperçu des données</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
+            {[
+              ["👥 Patients", data.patients.length, "#0a5c8a"],
+              ["👨‍⚕️ Médecins", data.medecins.length, "#0f6e56"],
+              ["📅 Rendez-vous", data.rdvs.length, "#854f0b"],
+              ["🔬 Consultations", data.consultations.length, "#7c3aed"],
+              ["🏥 Hospitalisations", data.hospitalisations.length, "#c0392b"],
+              ["💰 Factures", data.factures.length, "#0a5c8a"],
+            ].map(([lbl, val, col]) => (
+              <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fafbfc", border: "1px solid #f0f4f8", borderRadius: 8 }}>
+                <span style={{ color: "var(--text-secondary, #4a6070)", fontWeight: 600 }}>{lbl}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: col, fontFamily: "'Playfair Display',serif" }}>{val}</span>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #0d1f2d)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nom}</div>
-                <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 2 }}>{r.date} · {r.taille}</div>
-              </div>
-              <button className="btn-action btn-edit">↓ Télécharger</button>
+            ))}
+            <div style={{ fontSize: 11, color: "#7a90a0", marginTop: 8, fontStyle: "italic", textAlign: "center" }}>
+              Le rapport sera filtré selon la période sélectionnée.
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </>
